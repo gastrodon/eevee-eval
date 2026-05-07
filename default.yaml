@@ -1,0 +1,57 @@
+# eevee-eval configuration
+# Copy this file and fill in package + dir to run a scenario.
+
+# Required: scenario to run (eevee-eval -l to list available packages)
+package: nes-tetris
+
+# Required: directory to load and save genome files
+dir: ./genomes
+
+# Scenario-specific arguments as a single string.
+# For nes-tetris / tetris-c: "--seed 0 --level 0"
+extra: ""
+
+# Stop after this many generations
+until_generation: 400
+
+# Stop early when best fitness reaches this value (omit to disable)
+# until_fitness: 0.95
+
+# Print stats and save genomes every N generations
+report_every: 10
+
+# Number of genomes in the population (ignored when resuming from saved files)
+population: 100
+
+# Show a live terminal display of the fittest genome playing
+watch: false
+
+# Number of eval threads (parallel builds only; omit for all available CPUs)
+# thread_count: 4
+
+# --- Speciation ---
+
+# Compatibility distance below which two genomes share a species
+specie_threshold: 4.0
+
+# Minimum population slots given to any surviving species
+specie_min_pop: 2
+
+# Fitness multiplier applied to brand-new species (decays linearly to 1.0)
+specie_youth_fac: 2.0
+
+# Age (generations) at which the youth multiplier reaches 1.0
+specie_youth_dropoff: 10
+
+# --- Stagnation ---
+
+# Generations without improvement before a species is penalised
+no_improvement_truncate: 10
+
+# Members kept when a stagnant species is truncated (kill if at or below this)
+no_improvement_floor: 2
+
+# --- Reproduction ---
+
+# Copy/crossover split: 1/N offspring are copy-mutants, the rest are crossover
+copy_denom: 4
