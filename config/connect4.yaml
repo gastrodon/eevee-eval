@@ -1,0 +1,6 @@
+package: connect4
+dir: ./eval/connect4
+until_generation: 400
+population: 100
+report_every: 10
+watch: false

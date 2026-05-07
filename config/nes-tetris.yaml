@@ -1,0 +1,7 @@
+package: nes-tetris
+dir: ./eval/nes-tetris
+until_generation: 400
+population: 100
+report_every: 10
+watch: false
+extra: "--seed 0 --level 0"

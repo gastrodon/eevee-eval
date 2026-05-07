@@ -11,7 +11,7 @@ use eevee::{
     network::{activate::steep_sigmoid, Continuous, ToNetwork},
     population::population_init,
     random::{seed_urandom, WyRng},
-    scenario::{evolve, EvolutionHooks},
+    scenario::{evolve, EvolutionConfig, EvolutionHooks},
     serialize::{population_from_files, population_to_files},
     Scenario,
 };

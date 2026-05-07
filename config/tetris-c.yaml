@@ -1,0 +1,7 @@
+package: tetris-c
+dir: ./eval/tetris-c
+until_generation: 400
+population: 100
+report_every: 10
+watch: true
+extra: "--seed 0 --level 10"

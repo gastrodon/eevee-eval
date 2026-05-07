@@ -1,0 +1,7 @@
+package: nes-mario
+dir: ./eval/nes-super-mario
+until_generation: 40
+population: 100
+report_every: 1
+watch: true
+extra: "--max-frames 1800"
