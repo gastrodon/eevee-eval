@@ -1,6 +1,5 @@
 fn main() {
     eevee_eval::cli_run(&[
-        ("nes-tetris", eevee_eval::scenarios::nes::run),
         ("nes-mario", eevee_eval::scenarios::mario::run),
         ("tetris-c", eevee_eval::scenarios::c::run),
         ("tic-tac-toe", eevee_eval::scenarios::board_game::ttt::run),

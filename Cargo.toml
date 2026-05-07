@@ -1,5 +1,5 @@
 [workspace]
-members = ["nes-tetris", "tetris-c"]
+members = ["tetris-c"]
 resolver = "2"
 
 [workspace.dependencies]

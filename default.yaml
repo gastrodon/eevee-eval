@@ -2,13 +2,13 @@
 # Copy this file and fill in package + dir to run a scenario.
 
 # Required: scenario to run (eevee-eval -l to list available packages)
-package: nes-tetris
+package: nes-mario
 
 # Required: directory to load and save genome files
 dir: ./genomes
 
 # Scenario-specific arguments as a single string.
-# For nes-tetris / tetris-c: "--seed 0 --level 0"
+# For tetris-c / nes-mario: "--seed 0 --level 0"
 extra: ""
 
 # Stop after this many generations

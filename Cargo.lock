@@ -483,13 +483,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nes-tetris"
-version = "0.1.0"
-dependencies = [
- "eevee-eval",
-]
-
-[[package]]
 name = "nes_rust_slim"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

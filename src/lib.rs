@@ -160,8 +160,8 @@ impl CommonArgs {
 /// Top-level YAML config understood by [`cli_run`] and [`load_config`].
 ///
 /// ```yaml
-/// package: nes-tetris
-/// dir: ./genomes/nes
+/// package: nes-mario
+/// dir: ./genomes/mario
 /// extra: "--seed 0 --level 3"
 /// until_generation: 400
 /// population: 150
