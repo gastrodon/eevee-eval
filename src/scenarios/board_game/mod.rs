@@ -8,7 +8,7 @@ use board_game::board::Player;
 use core::ops::ControlFlow;
 use eevee::{
     genome::{Recurrent, WConnection},
-    network::{activate::steep_sigmoid, Continuous, ToNetwork},
+    network::{activate::steep_sigmoid, Continuous, FromGenome, Network, ToNetwork},
     population::population_init,
     random::{seed_urandom, WyRng},
     scenario::{evolve, EvolutionConfig, EvolutionHooks},
@@ -34,37 +34,39 @@ pub type G = Recurrent<C>;
 
 /// Game-specific logic for a co-evolutionary board-game scenario.
 ///
-/// Implement this on a unit struct; `CoEvolScenario<T>` provides the full
+/// Implement this on a unit struct; `CoEvolScenario<T, NN>` provides the full
 /// `Scenario` impl (pool sampling, alternating sides, averaging) for free.
 pub trait CoEvolGame {
     const GAMES_PER_EVAL: usize;
     fn io() -> (usize, usize);
-    fn play<A: Fn(f64) -> f64>(
-        learner: &mut Continuous,
+    fn play<NN: Network, A: Fn(f64) -> f64>(
+        learner: &mut NN,
         learner_player: Player,
-        opponent: Option<&mut Continuous>,
+        opponent: Option<&mut NN>,
         σ: &A,
         rng: &mut WyRng,
     ) -> f64;
 }
 
-pub struct CoEvolScenario<T: CoEvolGame> {
+pub struct CoEvolScenario<T, NN> {
     pub pool: Arc<RwLock<Vec<G>>>,
     seed_counter: AtomicU64,
     _game: PhantomData<fn() -> T>,
+    _network: PhantomData<fn() -> NN>,
 }
 
-impl<T: CoEvolGame> CoEvolScenario<T> {
+impl<T: CoEvolGame, NN> CoEvolScenario<T, NN> {
     pub fn new(pool: Arc<RwLock<Vec<G>>>, base_seed: u64) -> Self {
         Self {
             pool,
             seed_counter: AtomicU64::new(base_seed),
             _game: PhantomData,
+            _network: PhantomData,
         }
     }
 }
 
-impl<T: CoEvolGame, A: Fn(f64) -> f64> Scenario<C, G, A> for CoEvolScenario<T> {
+impl<T: CoEvolGame, NN: Network + FromGenome<C, G>, A: Fn(f64) -> f64> Scenario<C, G, A> for CoEvolScenario<T, NN> {
     fn io(&self) -> (usize, usize) {
         T::io()
     }
@@ -84,7 +86,7 @@ impl<T: CoEvolGame, A: Fn(f64) -> f64> Scenario<C, G, A> for CoEvolScenario<T> {
             }
         };
 
-        let mut learner = genome.network();
+        let mut learner: NN = genome.network();
         let mut total = 0.0;
 
         for i in 0..T::GAMES_PER_EVAL {
@@ -92,7 +94,7 @@ impl<T: CoEvolGame, A: Fn(f64) -> f64> Scenario<C, G, A> for CoEvolScenario<T> {
             let score = if opponents.is_empty() {
                 T::play(&mut learner, learner_player, None, σ, &mut rng)
             } else {
-                let mut opp = opponents[i % opponents.len()].network();
+                let mut opp: NN = opponents[i % opponents.len()].network();
                 T::play(&mut learner, learner_player, Some(&mut opp), σ, &mut rng)
             };
             total += score;

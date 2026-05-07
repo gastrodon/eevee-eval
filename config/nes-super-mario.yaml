@@ -4,4 +4,5 @@ until_generation: 400
 population: 100
 report_every: 1
 watch: true
-extra: "--max-frames 1800"
+extra: "--max-frames 2800"
+specie_threshold: 1.1

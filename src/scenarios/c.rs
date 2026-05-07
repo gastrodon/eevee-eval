@@ -8,8 +8,8 @@ use core::ops::ControlFlow;
 use eevee::{
     activate::relu,
     genome::{Recurrent, WConnection},
-    network::{Continuous, ToNetwork},
-    Network,
+    network::{Continuous, FromGenome, ToNetwork},
+    Connection, Genome, Network,
 };
 use std::ffi::c_void;
 
@@ -119,9 +119,9 @@ impl TetrisEngine for CEngine {
 // Exhibition game (--watch)
 // ---------------------------------------------------------------------------
 
-fn run_exhibition_game(genome: &Recurrent<WConnection>, seed: u16, level: u8) {
+fn run_exhibition_game<C: Connection, G: Genome<C>, NN: Network + FromGenome<C, G>>(genome: G, seed: u16, level: u8) {
     let mut engine = CEngine::new_game(seed, level);
-    let mut network: Continuous = genome.network();
+    let mut network: NN = genome.network();
     let mut sense = [0.0f64; BOARD_SIZE];
 
     loop {
@@ -145,16 +145,16 @@ fn run_exhibition_game(genome: &Recurrent<WConnection>, seed: u16, level: u8) {
 // ---------------------------------------------------------------------------
 
 pub fn run(dir: &str, common: CommonArgs, extra: Vec<String>) {
-    let targs = TetrisArgs::parse_from(
-        std::iter::once("tetris-c").chain(extra.iter().map(String::as_str)),
-    );
-
-    type C = WConnection;
-    type G = Recurrent<C>;
+    let targs =
+        TetrisArgs::parse_from(std::iter::once("tetris-c").chain(extra.iter().map(String::as_str)));
 
     let watch = common.watch;
     let games = targs.games;
     let level = targs.level;
+
+    type C = WConnection;
+    type G = Recurrent<C>;
+    type N = Continuous;
 
     let watch_hook: Hook<C, G> = Box::new(|stats: &mut Stats<C, G>| {
         let max = stats.fittest().map(|(_, f)| *f).unwrap_or(0.0);
@@ -163,7 +163,9 @@ pub fn run(dir: &str, common: CommonArgs, extra: Vec<String>) {
     });
 
     let watch_fn: Option<Box<dyn Fn(&G) + Send + 'static>> = if watch {
-        Some(Box::new(move |genome| run_exhibition_game(genome, next_seed(), level)))
+        Some(Box::new(move |genome| {
+            run_exhibition_game::<C, G, N>(genome.clone(), next_seed(), level)
+        }))
     } else {
         None
     };

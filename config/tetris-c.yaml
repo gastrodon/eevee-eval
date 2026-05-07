@@ -1,8 +1,8 @@
 package: tetris-c
 dir: ./eval/tetris-c
 until_generation: 1000
-population: 10
-report_every: 5
+population: 64
+report_every: 10
 watch: false
-extra: "--level 10 --games 5"
-specie_threshold: 1.1
+extra: "--level 10 --games 8"
+specie_threshold: 1.7

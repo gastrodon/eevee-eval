@@ -3,7 +3,7 @@ use crate::CommonArgs;
 use board_game::board::{Board, Outcome, Player};
 use board_game::games::connect4::Connect4;
 use eevee::{
-    network::{Continuous, Network, ToNetwork},
+    network::{Continuous, FromGenome, Network, ToNetwork},
     random::WyRng,
 };
 use rand::{Rng, RngCore};
@@ -65,8 +65,8 @@ fn legal_columns(board: &Connect4) -> Vec<u8> {
         .collect()
 }
 
-fn network_move<A: Fn(f64) -> f64>(
-    network: &mut Continuous,
+fn network_move<NN: Network, A: Fn(f64) -> f64>(
+    network: &mut NN,
     board: &Connect4,
     shadow: &ShadowBoard,
     viewpoint: Player,
@@ -101,10 +101,10 @@ fn random_move<R: RngCore>(board: &Connect4, rng: &mut R) -> Option<u8> {
     }
 }
 
-fn play_game<A: Fn(f64) -> f64>(
-    learner: &mut Continuous,
+fn play_game<NN: Network, A: Fn(f64) -> f64>(
+    learner: &mut NN,
     learner_player: Player,
-    opponent: Option<&mut Continuous>,
+    opponent: Option<&mut NN>,
     σ: &A,
     rng: &mut eevee::random::WyRng,
 ) -> f64 {
@@ -147,10 +147,10 @@ pub struct Connect4Game;
 impl CoEvolGame for Connect4Game {
     const GAMES_PER_EVAL: usize = 8;
     fn io() -> (usize, usize) { (INPUT_DIM, OUTPUT_DIM) }
-    fn play<A: Fn(f64) -> f64>(
-        learner: &mut Continuous,
+    fn play<NN: Network, A: Fn(f64) -> f64>(
+        learner: &mut NN,
         learner_player: Player,
-        opponent: Option<&mut Continuous>,
+        opponent: Option<&mut NN>,
         σ: &A,
         rng: &mut WyRng,
     ) -> f64 {
@@ -177,12 +177,12 @@ fn render_connect4(shadow: &ShadowBoard) {
     println!();
 }
 
-fn run_exhibition_game(genome: &G) {
+fn run_exhibition_game<NN: Network + FromGenome<C, G>>(genome: &G) {
     use eevee::network::activate::steep_sigmoid;
     let mut board = Connect4::default();
     let mut shadow = ShadowBoard::default();
-    let mut net_a: Continuous = genome.network();
-    let mut net_b: Continuous = genome.network();
+    let mut net_a: NN = genome.network();
+    let mut net_b: NN = genome.network();
     net_a.flush();
     net_b.flush();
     render_connect4(&shadow);
@@ -204,11 +204,12 @@ fn run_exhibition_game(genome: &G) {
 
 pub fn run(dir: &str, common: CommonArgs, _extra: Vec<String>) {
     use eevee::random::seed_urandom;
+    type N = Continuous;
     let base_seed = seed_urandom().unwrap();
     let pool = Arc::new(RwLock::new(vec![]));
-    let scenario = CoEvolScenario::<Connect4Game>::new(Arc::clone(&pool), base_seed);
+    let scenario = CoEvolScenario::<Connect4Game, N>::new(Arc::clone(&pool), base_seed);
     let watch_fn: Option<Box<dyn Fn(&G) + Send + 'static>> = if common.watch {
-        Some(Box::new(|genome: &G| run_exhibition_game(genome)))
+        Some(Box::new(|genome: &G| run_exhibition_game::<N>(genome)))
     } else {
         None
     };

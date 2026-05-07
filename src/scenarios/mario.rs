@@ -3,8 +3,8 @@ use clap::Parser;
 use core::ops::ControlFlow;
 use eevee::{
     activate::relu,
-    genome::{Genome, Recurrent, WConnection},
-    network::{Continuous, ToNetwork},
+    genome::{connection::BWConnection, Genome, Recurrent, WConnection},
+    network::{Continuous, FromGenome, Simple, ToNetwork},
     Connection, Network, Scenario,
 };
 use nes_rust_slim::{
@@ -113,7 +113,6 @@ fn make_nes() -> Nes {
     nes
 }
 
-
 fn apply_outputs(nes: &mut Nes, outputs: &[f64]) {
     for (out_idx, &btn_idx) in BTN_INDICES.iter().enumerate() {
         nes.get_mut_cpu().joypad1.buttons[btn_idx] = outputs[out_idx] >= 0.5;
@@ -206,8 +205,12 @@ impl WinState {
                 "Super Mario Bros (NES)",
                 256,
                 240,
-                minifb::WindowOptions { scale: minifb::Scale::X2, ..Default::default() },
-            ).expect("failed to open NES window"),
+                minifb::WindowOptions {
+                    scale: minifb::Scale::X2,
+                    ..Default::default()
+                },
+            )
+            .expect("failed to open NES window"),
             rgba: vec![0u8; 256 * 240 * 4],
             fb: vec![0u32; 256 * 240],
         }
@@ -219,9 +222,9 @@ thread_local! {
     static WIN: std::cell::RefCell<Option<WinState>> = std::cell::RefCell::new(None);
 }
 
-fn run_exhibition(genome: &Recurrent<WConnection>) {
+fn run_exhibition<C: Connection, G: Genome<C>, NN: Network + FromGenome<C, G>>(genome: G) {
     let mut nes = make_nes();
-    let mut network: Continuous = genome.network();
+    let mut network: NN = genome.network();
     let mut sense = [0.0f64; NUM_INPUTS];
     let mut last_progress = mario_progress(&nes.get_cpu().get_ram().data);
     let mut stall = 0usize;
@@ -266,10 +269,19 @@ fn run_exhibition(genome: &Recurrent<WConnection>) {
         });
 
         let ram = &nes.get_cpu().get_ram().data;
-        if ram[PLAYER_STATUS] != 3 { break; }
+        if ram[PLAYER_STATUS] != 3 {
+            break;
+        }
         let p = mario_progress(ram);
-        if p > last_progress { last_progress = p; stall = 0; } else { stall += 1; }
-        if stall >= 60 { break; }
+        if p > last_progress {
+            last_progress = p;
+            stall = 0;
+        } else {
+            stall += 1;
+        }
+        if stall >= 60 {
+            break;
+        }
     }
 }
 
@@ -278,12 +290,12 @@ fn run_exhibition(genome: &Recurrent<WConnection>) {
 // ---------------------------------------------------------------------------
 
 pub fn run(dir: &str, common: CommonArgs, extra: Vec<String>) {
-    let margs = MarioArgs::parse_from(
-        std::iter::once("nes-mario").chain(extra.iter().map(String::as_str)),
-    );
+    let margs =
+        MarioArgs::parse_from(std::iter::once("nes-mario").chain(extra.iter().map(String::as_str)));
 
-    type C = WConnection;
+    type C = BWConnection;
     type G = Recurrent<C>;
+    type NN = Simple<C>;
 
     let watch = common.watch;
     let max_frames = margs.max_frames;
@@ -295,7 +307,7 @@ pub fn run(dir: &str, common: CommonArgs, extra: Vec<String>) {
     });
 
     let watch_fn: Option<Box<dyn Fn(&G) + Send + 'static>> = if watch {
-        Some(Box::new(move |genome| run_exhibition(genome)))
+        Some(Box::new(move |genome| run_exhibition::<_, _, NN>(genome.clone())))
     } else {
         None
     };
