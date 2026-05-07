@@ -1,6 +1,6 @@
 use crate::{
     draw_output, render_frame,
-    tetris::{draw_footer, update_watch, TetrisEngine, TetrisScenario, BOARD_SIZE},
+    tetris::{draw_footer, next_seed, update_watch, TetrisEngine, TetrisScenario, BOARD_SIZE},
     CommonArgs, Hook, Stats,
 };
 use clap::Parser;
@@ -19,9 +19,9 @@ use std::ffi::c_void;
 
 #[derive(Parser)]
 struct TetrisArgs {
-    /// RNG seed (0 = random)
-    #[arg(long, default_value_t = 0)]
-    seed: u16,
+    /// Number of games per evaluation (fitness = average score)
+    #[arg(long, default_value_t = 1)]
+    games: usize,
     /// Starting level (0–29; affects drop speed)
     #[arg(long, default_value_t = 0)]
     level: u8,
@@ -153,7 +153,7 @@ pub fn run(dir: &str, common: CommonArgs, extra: Vec<String>) {
     type G = Recurrent<C>;
 
     let watch = common.watch;
-    let seed = targs.seed;
+    let games = targs.games;
     let level = targs.level;
 
     let watch_hook: Hook<C, G> = Box::new(|stats: &mut Stats<C, G>| {
@@ -163,13 +163,13 @@ pub fn run(dir: &str, common: CommonArgs, extra: Vec<String>) {
     });
 
     let watch_fn: Option<Box<dyn Fn(&G) + Send + 'static>> = if watch {
-        Some(Box::new(move |genome| run_exhibition_game(genome, seed, level)))
+        Some(Box::new(move |genome| run_exhibition_game(genome, next_seed(), level)))
     } else {
         None
     };
 
     crate::run(
-        TetrisScenario::<CEngine>::new(seed, level),
+        TetrisScenario::<CEngine>::new(level, games),
         dir,
         common,
         watch_fn,

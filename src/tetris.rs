@@ -5,12 +5,25 @@
 use eevee::{
     genome::Genome,
     network::{Continuous, ToNetwork},
+    random::WyRng,
     Connection, Network, Scenario,
 };
+use rand::RngCore;
+use eevee::random::seed_urandom;
 use std::{
     marker::PhantomData,
-    sync::atomic::{AtomicU64, AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+        LazyLock,
+    },
 };
+
+static SEED_COUNTER: LazyLock<AtomicU64> =
+    LazyLock::new(|| AtomicU64::new(seed_urandom().unwrap_or(0)));
+
+pub fn next_seed() -> u16 {
+    WyRng::seeded(SEED_COUNTER.fetch_add(1, Ordering::Relaxed)).next_u64() as u16
+}
 
 pub const BOARD_SIZE: usize = 200;
 
@@ -45,14 +58,14 @@ pub trait TetrisEngine {
 /// regardless of whether `E` itself is, because the engine is only ever
 /// constructed locally inside `eval()` — never shared across threads.
 pub struct TetrisScenario<E: TetrisEngine> {
-    pub seed: u16,
     pub level: u8,
+    pub games: usize,
     _engine: PhantomData<fn(u16) -> E>,
 }
 
 impl<E: TetrisEngine> TetrisScenario<E> {
-    pub fn new(seed: u16, level: u8) -> Self {
-        Self { seed, level, _engine: PhantomData }
+    pub fn new(level: u8, games: usize) -> Self {
+        Self { level, games, _engine: PhantomData }
     }
 }
 
@@ -68,17 +81,23 @@ where
     }
 
     fn eval(&self, genome: &G, σ: &A) -> f64 {
-        let mut engine = E::new_game(self.seed, self.level);
-        let mut network = genome.network();
-        let mut sense = [0.0f64; BOARD_SIZE];
-        loop {
-            engine.sense(&mut sense);
-            network.step(1, &sense, σ);
-            if engine.tick(network.output()) {
-                break;
-            }
-        }
-        engine.score()
+        let total: f64 = (0..self.games)
+            .map(|_| {
+                let seed = next_seed();
+                let mut engine = E::new_game(seed, self.level);
+                let mut network = genome.network();
+                let mut sense = [0.0f64; BOARD_SIZE];
+                loop {
+                    engine.sense(&mut sense);
+                    network.step(1, &sense, σ);
+                    if engine.tick(network.output()) {
+                        break;
+                    }
+                }
+                engine.score()
+            })
+            .sum();
+        total / self.games as f64
     }
 }
 
