@@ -181,6 +181,11 @@ long tetris_score(struct tetris_ctx *ctx)
 	return (long)ctx->points;
 }
 
+long tetris_piece_count(struct tetris_ctx *ctx)
+{
+	return (long)(ctx->queue_i - 1);
+}
+
 void tetris_set_level(struct tetris_ctx *ctx, int level)
 {
 	ctx->level = level;

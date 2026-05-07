@@ -40,6 +40,7 @@ unsafe extern "C" {
     fn tetris_tick(s: *mut GameState, input: i32) -> i32;
     fn tetris_sense(s: *mut GameState, out: *mut f64);
     fn tetris_score(s: *mut GameState) -> i64;
+    fn tetris_piece_count(s: *mut GameState) -> i64;
     fn tetris_set_level(s: *mut GameState, level: i32);
 }
 
@@ -108,7 +109,9 @@ impl TetrisEngine for CEngine {
     }
 
     fn score(&self) -> f64 {
-        unsafe { tetris_score(self.game.0) as f64 }
+        let points = unsafe { tetris_score(self.game.0) };
+        let pieces = unsafe { tetris_piece_count(self.game.0) };
+        (points * 256 + pieces) as f64
     }
 }
 
