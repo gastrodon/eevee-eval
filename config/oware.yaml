@@ -1,0 +1,6 @@
+package: oware
+dir: ./eval/oware
+until_generation: 400
+population: 100
+report_every: 10
+watch: false
