@@ -22,16 +22,6 @@ use std::{
 
 pub use eevee::scenario::{Hook, Stats};
 
-/// Print a generation stat line. When `watch` is active, writes to stderr at
-/// column 40 (to the right of the board) without disturbing the board render.
-pub fn print_stat(watch: bool, msg: &str) {
-    if watch {
-        eprint!("\x1b[s\x1b[1;40H{}\x1b[u", msg);
-    } else {
-        println!("{}", msg);
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Terminal rendering
 // ---------------------------------------------------------------------------
@@ -192,13 +182,13 @@ pub fn run<
             .iter()
             .map(|s| format!("{}%", (s.members.len() * 100) / total.max(1)))
             .collect();
-        crate::print_stat(watch, &format!(
+        println!(
             "gen {} best: {:.3}  species: {}  [{}]",
             stats.generation,
             fittest.1,
             stats.species.len(),
             shares.join(", ")
-        ));
+        );
         population_to_files(&dir, stats.species).unwrap();
 
         if stats.generation >= until_generation {

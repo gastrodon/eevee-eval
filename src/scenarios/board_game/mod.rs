@@ -105,10 +105,10 @@ pub fn board_game_run<
         if stats.generation % report_every == 0 {
             if let Some((_, f)) = stats.fittest() {
                 let hall_size = pool_for_save.read().unwrap().len();
-                crate::print_stat(watch, &format!(
+                println!(
                     "gen {} best: {:.4} | hall {}",
                     stats.generation, f, hall_size
-                ));
+                );
                 population_to_files(&dir_owned, stats.species).unwrap();
             }
         }
