@@ -94,6 +94,8 @@ pub struct CommonArgs {
 // Generic evolve runner
 // ---------------------------------------------------------------------------
 
+type WatchFn<G> = dyn Fn(&G) + Send + 'static;
+
 pub fn run<
     C: Connection,
     G: Genome<C> + SerializeFile + Clone + Send + 'static,
@@ -103,7 +105,7 @@ pub fn run<
     scenario: S,
     dir: &str,
     args: CommonArgs,
-    watch_fn: Option<Box<dyn Fn(&G) + Send + 'static>>,
+    watch_fn: Option<Box<WatchFn<G>>>,
     extra_hooks: Vec<Hook<C, G>>,
 ) {
     #[cfg(feature = "parallel")]
@@ -145,9 +147,8 @@ pub fn run<
                 print!("\x1b[2J\x1b[H");
                 loop {
                     let genome = slot.lock().unwrap().clone();
-                    match genome {
-                        Some(g) => f(&g),
-                        None => {}
+                    if let Some(g) = genome {
+                        f(&g)
                     }
                 }
             });
@@ -168,7 +169,7 @@ pub fn run<
             }
         }
 
-        if stats.generation % report_every != 0 {
+        if !stats.generation.is_multiple_of(report_every) {
             return ControlFlow::Continue(());
         }
 
