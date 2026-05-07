@@ -97,10 +97,8 @@ pub struct CommonArgs {
 pub fn run<
     C: Connection,
     G: Genome<C> + SerializeFile + Clone + Send + 'static,
-    #[cfg(not(feature = "parallel"))]
-    S: Scenario<C, G, fn(f64) -> f64>,
-    #[cfg(feature = "parallel")]
-    S: Scenario<C, G, fn(f64) -> f64> + Sync,
+    #[cfg(not(feature = "parallel"))] S: Scenario<C, G, fn(f64) -> f64>,
+    #[cfg(feature = "parallel")] S: Scenario<C, G, fn(f64) -> f64> + Sync,
 >(
     scenario: S,
     dir: &str,
@@ -110,13 +108,18 @@ pub fn run<
 ) {
     #[cfg(feature = "parallel")]
     {
-        let max = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
+        let max = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1);
         let n = args.thread_count.unwrap_or(max);
         if n < 1 || n > max {
             eprintln!("--thread-count must be between 1 and {max}");
             std::process::exit(1);
         }
-        rayon::ThreadPoolBuilder::new().num_threads(n).build_global().unwrap();
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(n)
+            .build_global()
+            .unwrap();
     }
 
     create_dir_all(dir).expect("failed to create genome output directory");
@@ -127,7 +130,11 @@ pub fn run<
     });
 
     let best: Arc<Mutex<Option<G>>> = {
-        let seed = init.0.first().and_then(|s| s.members.first()).map(|(g, _)| g.clone());
+        let seed = init
+            .0
+            .first()
+            .and_then(|s| s.members.first())
+            .map(|(g, _)| g.clone());
         Arc::new(Mutex::new(seed))
     };
 
@@ -140,7 +147,7 @@ pub fn run<
                     let genome = slot.lock().unwrap().clone();
                     match genome {
                         Some(g) => f(&g),
-                        None => {},
+                        None => {}
                     }
                 }
             });
@@ -165,16 +172,15 @@ pub fn run<
             return ControlFlow::Continue(());
         }
 
-        if let Some(fittest) = stats.fittest() {
-            println!("gen {} best: {:.3}", stats.generation, fittest.1);
-        }
+        let fittest = stats.fittest().unwrap();
+        println!("gen {} best: {:.3}", stats.generation, fittest.1);
         population_to_files(&dir, stats.species).unwrap();
 
         if stats.generation >= until_generation {
             return ControlFlow::Break(());
         }
         if let Some(threshold) = until_fitness {
-            if stats.fittest().map(|f| f.1).unwrap_or(0.0) >= threshold {
+            if fittest.1 >= threshold {
                 return ControlFlow::Break(());
             }
         }
