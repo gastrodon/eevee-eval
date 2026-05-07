@@ -31,14 +31,18 @@
         ]
       },
       "locked": {
-        "lastModified": 1778122303,
-        "narHash": "sha256-ZMJ67ZITqF15e7mryM/NZZ6ip13f56BDZvQjYgu1rfw=",
-        "path": "/home/eva/code/eevee",
-        "type": "path"
+        "lastModified": 1778136054,
+        "narHash": "sha256-z2B4Xcmxs1NKDUWEKz1IaWV6Xbf5DAF/ns/GM+E9dMs=",
+        "owner": "gastrodon",
+        "repo": "eevee",
+        "rev": "0a59886ca563d8b51c17e3f8cee7f50f3e032e3d",
+        "type": "github"
       },
       "original": {
-        "path": "/home/eva/code/eevee",
-        "type": "path"
+        "owner": "gastrodon",
+        "ref": "devel",
+        "repo": "eevee",
+        "type": "github"
       }
     },
     "fenix": {

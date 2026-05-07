@@ -10,8 +10,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     eevee = {
-      # url = "github:gastrodon/eevee";
-      url = "path:/home/eva/code/eevee";
+      url = "github:gastrodon/eevee/devel";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.crane.follows = "crane";
       inputs.fenix.follows = "fenix";
@@ -43,8 +42,8 @@
           filter =
             path: type:
             (craneLib.filterCargoSources path type)
-            || (builtins.match ".*/nes-tetris/src/data(/.*)?$" path != null)
-            || (builtins.match ".*/tetris-c/vendor(/.*)?$" path != null);
+            || (builtins.match ".*/tetris-c/vendor(/.*)?$" path != null)
+            || (builtins.match ".*\\.nes$" path != null);
         };
 
         # Assemble the full build tree.
@@ -59,16 +58,17 @@
           cp -rT ${eevee} $out/eevee
           substituteInPlace $out/Cargo.toml \
             --replace 'path = "../eevee"' 'path = "./eevee"'
+          # Exclude eevee from workspace member discovery so that cargo's
+          # --all-targets does not try to build eevee's bench/example targets
+          # (which have dev-deps not present in this workspace's vendor store).
+          substituteInPlace $out/Cargo.toml \
+            --replace 'members = ["tetris-c"]' 'members = ["tetris-c"]
+exclude = ["eevee"]'
         '';
 
         commonArgs = {
           inherit src;
           strictDeps = true;
-          # Skip --all-targets for the dep-only step: the local eevee path dep
-          # is now inside the workspace root, so cargo treats its dev/optional
-          # targets as in-scope, pulling in deps not present in the lock file.
-          # The full per-package builds below still compile every binary target.
-          cargoCheckExtraArgs = "";
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
@@ -87,12 +87,8 @@
       {
         packages = {
           default = mkPkg { };
-          nes-tetris = mkPkg { cargoExtraArgs = "-p nes-tetris"; };
           tetris-c = mkPkg { cargoExtraArgs = "-p tetris-c"; };
           parallel = mkPkg { cargoExtraArgs = "--features parallel"; };
-          nes-tetris-parallel = mkPkg {
-            cargoExtraArgs = "-p nes-tetris --features parallel";
-          };
           tetris-c-parallel = mkPkg {
             cargoExtraArgs = "-p tetris-c --features parallel";
           };
