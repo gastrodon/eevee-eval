@@ -153,6 +153,7 @@ pub fn board_game_run<
     let until_generation = common.until_generation;
     let until_fitness = common.until_fitness;
     let report_every = common.report_every;
+    let config = common.evolution_config();
     let dir_owned = dir.to_owned();
     let pool_for_save = Arc::clone(&pool);
 
@@ -224,5 +225,6 @@ pub fn board_game_run<
         steep_sigmoid as fn(f64) -> f64,
         WyRng::seeded(base_seed),
         EvolutionHooks::new(vec![refresh_hook(pool), save_hook]),
+        config,
     );
 }

@@ -11,7 +11,7 @@ use eevee::{
     genome::Genome,
     population::population_init,
     random::default_rng,
-    scenario::{evolve, EvolutionHooks},
+    scenario::{evolve, EvolutionConfig, EvolutionHooks},
     serialize::{population_from_files, population_to_files},
     Connection, Scenario, SerializeFile,
 };
@@ -124,6 +124,43 @@ pub struct CommonArgs {
     #[cfg(feature = "parallel")]
     #[arg(long)]
     pub thread_count: Option<usize>,
+
+    // --- EvolutionConfig fields ---
+    /// Compatibility distance threshold for grouping genomes into the same species
+    #[arg(long, default_value_t = 4.0)]
+    pub specie_threshold: f64,
+    /// Generations without improvement before a species is penalised
+    #[arg(long, default_value_t = 10)]
+    pub no_improvement_truncate: usize,
+    /// Members retained when a stagnant species is truncated
+    #[arg(long, default_value_t = 2)]
+    pub no_improvement_floor: usize,
+    /// Copy/crossover split denominator (1/N offspring are copy-mutants)
+    #[arg(long, default_value_t = 4)]
+    pub copy_denom: usize,
+    /// Fitness multiplier for brand-new species at age 0
+    #[arg(long, default_value_t = 2.0)]
+    pub specie_youth_fac: f64,
+    /// Age at which the youth multiplier reaches 1.0
+    #[arg(long, default_value_t = 10)]
+    pub specie_youth_dropoff: usize,
+    /// Minimum population slots allocated to any surviving species
+    #[arg(long, default_value_t = 2)]
+    pub specie_min_pop: usize,
+}
+
+impl CommonArgs {
+    pub fn evolution_config(&self) -> EvolutionConfig {
+        EvolutionConfig {
+            specie_threshold: self.specie_threshold,
+            no_improvement_truncate: self.no_improvement_truncate,
+            no_improvement_floor: self.no_improvement_floor,
+            copy_denom: self.copy_denom,
+            specie_youth_fac: self.specie_youth_fac,
+            specie_youth_dropoff: self.specie_youth_dropoff,
+            specie_min_pop: self.specie_min_pop,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -197,6 +234,7 @@ pub fn run<
     let report_every = args.report_every;
     let until_generation = args.until_generation;
     let until_fitness = args.until_fitness;
+    let config = args.evolution_config();
 
     let runner_hook = move |stats: &mut Stats<C, G>| -> ControlFlow<()> {
         if watch {
@@ -236,6 +274,7 @@ pub fn run<
         relu as fn(f64) -> f64,
         default_rng(),
         EvolutionHooks::new(hooks),
+        config,
     );
 }
 
