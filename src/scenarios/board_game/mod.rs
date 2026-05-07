@@ -105,10 +105,8 @@ pub fn board_game_run<
         if stats.generation % report_every == 0 {
             if let Some((_, f)) = stats.fittest() {
                 let hall_size = pool_for_save.read().unwrap().len();
-                eprintln!(
-                    "gen {} best: {:.4} | hall {}",
-                    stats.generation, f, hall_size
-                );
+                let sizes: Vec<usize> = stats.species.iter().map(|s| s.members.len()).collect();
+                crate::report_generation(stats.generation, *f, &sizes, Some(&format!("hall {}", hall_size)));
                 population_to_files(&dir_owned, stats.species).unwrap();
             }
         }

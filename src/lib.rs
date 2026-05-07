@@ -22,6 +22,23 @@ use std::{
 
 pub use eevee::scenario::{Hook, Stats};
 
+pub fn report_generation(generation: usize, fittest: f64, species_sizes: &[usize], extra: Option<&str>) {
+    let total: usize = species_sizes.iter().sum();
+    let shares: Vec<String> = species_sizes
+        .iter()
+        .map(|&n| format!("{}%", (n * 100) / total.max(1)))
+        .collect();
+    let mut line = format!(
+        "gen {} best: {:.3}  species: {}  [{}]",
+        generation, fittest, species_sizes.len(), shares.join(", ")
+    );
+    if let Some(e) = extra {
+        line.push_str("  ");
+        line.push_str(e);
+    }
+    eprintln!("{}", line);
+}
+
 // ---------------------------------------------------------------------------
 // Terminal rendering
 // ---------------------------------------------------------------------------
@@ -176,19 +193,8 @@ pub fn run<
         let Some(fittest) = stats.fittest() else {
             return ControlFlow::Continue(());
         };
-        let total: usize = stats.species.iter().map(|s| s.members.len()).sum();
-        let shares: Vec<String> = stats
-            .species
-            .iter()
-            .map(|s| format!("{}%", (s.members.len() * 100) / total.max(1)))
-            .collect();
-        eprintln!(
-            "gen {} best: {:.3}  species: {}  [{}]",
-            stats.generation,
-            fittest.1,
-            stats.species.len(),
-            shares.join(", ")
-        );
+        let sizes: Vec<usize> = stats.species.iter().map(|s| s.members.len()).collect();
+        crate::report_generation(stats.generation, *fittest.1, &sizes, None);
         population_to_files(&dir, stats.species).unwrap();
 
         if stats.generation >= until_generation {
