@@ -4,8 +4,8 @@
 pub mod scenarios;
 pub mod tetris;
 
-use clap::{Args, Parser};
 use core::ops::ControlFlow;
+use serde::Deserialize;
 use eevee::{
     activate::relu,
     genome::Genome,
@@ -100,53 +100,47 @@ pub fn draw_output(outputs: &[f64], labels: &[char]) {
 }
 
 // ---------------------------------------------------------------------------
-// CLI args — shared across all scenarios
+// Shared config (deserialised from YAML)
 // ---------------------------------------------------------------------------
 
-#[derive(Args, Clone)]
+#[derive(Deserialize, Clone)]
+#[serde(default)]
 pub struct CommonArgs {
-    /// Stop after this generation
-    #[arg(long, default_value_t = 400)]
     pub until_generation: usize,
-    /// Stop when best fitness reaches this threshold
-    #[arg(long)]
     pub until_fitness: Option<f64>,
-    /// Print stats and save every N generations
-    #[arg(long, default_value_t = 10)]
     pub report_every: usize,
-    /// Population size (ignored when resuming from files)
-    #[arg(long, default_value_t = 100)]
     pub population: usize,
-    /// Show a live terminal display of the fittest genome playing
-    #[arg(long)]
     pub watch: bool,
-    /// Number of eval threads (1 to CPU count; parallel builds only)
     #[cfg(feature = "parallel")]
-    #[arg(long)]
     pub thread_count: Option<usize>,
-
-    // --- EvolutionConfig fields ---
-    /// Compatibility distance threshold for grouping genomes into the same species
-    #[arg(long, default_value_t = 4.0)]
     pub specie_threshold: f64,
-    /// Generations without improvement before a species is penalised
-    #[arg(long, default_value_t = 10)]
     pub no_improvement_truncate: usize,
-    /// Members retained when a stagnant species is truncated
-    #[arg(long, default_value_t = 2)]
     pub no_improvement_floor: usize,
-    /// Copy/crossover split denominator (1/N offspring are copy-mutants)
-    #[arg(long, default_value_t = 4)]
     pub copy_denom: usize,
-    /// Fitness multiplier for brand-new species at age 0
-    #[arg(long, default_value_t = 2.0)]
     pub specie_youth_fac: f64,
-    /// Age at which the youth multiplier reaches 1.0
-    #[arg(long, default_value_t = 10)]
     pub specie_youth_dropoff: usize,
-    /// Minimum population slots allocated to any surviving species
-    #[arg(long, default_value_t = 2)]
     pub specie_min_pop: usize,
+}
+
+impl Default for CommonArgs {
+    fn default() -> Self {
+        Self {
+            until_generation: 400,
+            until_fitness: None,
+            report_every: 10,
+            population: 100,
+            watch: false,
+            #[cfg(feature = "parallel")]
+            thread_count: None,
+            specie_threshold: 4.0,
+            no_improvement_truncate: 10,
+            no_improvement_floor: 2,
+            copy_denom: 4,
+            specie_youth_fac: 2.0,
+            specie_youth_dropoff: 10,
+            specie_min_pop: 2,
+        }
+    }
 }
 
 impl CommonArgs {
@@ -161,6 +155,59 @@ impl CommonArgs {
             specie_min_pop: self.specie_min_pop,
         }
     }
+}
+
+/// Top-level YAML config understood by [`cli_run`] and [`load_config`].
+///
+/// ```yaml
+/// package: nes-tetris
+/// dir: ./genomes/nes
+/// extra: "--seed 0 --level 3"
+/// until_generation: 400
+/// population: 150
+/// ```
+///
+/// All fields except `package` and `dir` are optional and default to the
+/// values documented on [`CommonArgs`].
+#[derive(Deserialize)]
+#[serde(default)]
+pub struct Config {
+    pub package: String,
+    pub dir: String,
+    /// Scenario-specific arguments as a single string (e.g. `"--seed 0 --level 3"`).
+    pub extra: String,
+    #[serde(flatten)]
+    pub common: CommonArgs,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            package: String::new(),
+            dir: String::new(),
+            extra: String::new(),
+            common: CommonArgs::default(),
+        }
+    }
+}
+
+impl Config {
+    /// Split `extra` on whitespace into a `Vec<String>` suitable for passing to a scenario.
+    pub fn extra_vec(&self) -> Vec<String> {
+        self.extra.split_whitespace().map(|s| s.to_owned()).collect()
+    }
+}
+
+/// Read and parse a YAML config file, exiting on error.
+pub fn load_config(path: &str) -> Config {
+    let text = std::fs::read_to_string(path).unwrap_or_else(|e| {
+        eprintln!("error reading '{}': {}", path, e);
+        std::process::exit(1);
+    });
+    serde_yaml::from_str(&text).unwrap_or_else(|e| {
+        eprintln!("error parsing '{}': {}", path, e);
+        std::process::exit(1);
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +235,7 @@ pub fn run<
             .unwrap_or(1);
         let n = args.thread_count.unwrap_or(max);
         if n < 1 || n > max {
-            eprintln!("--thread-count must be between 1 and {max}");
+            eprintln!("thread_count must be between 1 and {max}");
             std::process::exit(1);
         }
         rayon::ThreadPoolBuilder::new()
@@ -282,67 +329,28 @@ pub fn run<
 // Unified CLI dispatcher
 // ---------------------------------------------------------------------------
 
-/// Dispatch to a named scenario package.
-///
-/// Parses common args (see [`CommonArgs`]) from argv.  Scenario-specific args
-/// may follow `--` on the command line and are passed as a `Vec<String>` to
-/// the chosen package function.
+/// Dispatch to a named scenario package from a YAML config file.
 ///
 /// ```text
-/// eevee-eval -p nes-tetris ./genomes --until-generation 200 -- --seed 42 --level 3
+/// eevee-eval run.yaml
 /// eevee-eval -l
 /// ```
 pub fn cli_run(packages: &[(&'static str, fn(&str, CommonArgs, Vec<String>))]) {
-    #[derive(Parser)]
-    #[command(name = "eevee-eval", about = "NEAT scenario runner")]
-    struct CliArgs {
-        /// List available scenario packages
-        #[arg(short = 'l', long)]
-        list: bool,
-        /// Scenario package to run
-        #[arg(short = 'p', long, value_name = "PKG")]
-        package: Option<String>,
-        /// Directory to load and save genomes
-        dir: Option<String>,
-        #[command(flatten)]
-        common: CommonArgs,
-    }
-
-    // Split argv on `--` to separate common from scenario-specific args.
-    let all: Vec<String> = std::env::args().collect();
-    let sep = all.iter().position(|a| a == "--");
-    let (head, extra) = match sep {
-        Some(i) => (all[..i].to_vec(), all[i + 1..].to_vec()),
-        None => (all, vec![]),
-    };
-
-    let args = CliArgs::parse_from(head);
-
-    if args.list {
-        for (name, _) in packages {
-            println!("{}", name);
-        }
-        return;
-    }
-
-    match args.package {
-        None => {
-            use clap::CommandFactory;
-            CliArgs::command().print_help().unwrap();
-            println!();
-        }
-        Some(ref pkg) => match packages.iter().find(|(name, _)| *name == pkg) {
-            None => {
-                eprintln!("unknown package '{}'. Use -l to list.", pkg);
-                std::process::exit(1);
+    match std::env::args().nth(1).as_deref() {
+        None | Some("-l") | Some("--list") => {
+            for (name, _) in packages {
+                println!("{}", name);
             }
-            Some((_, f)) => {
-                let dir = args.dir.unwrap_or_else(|| {
-                    eprintln!("error: <DIR> is required when using -p");
+        }
+        Some(path) => {
+            let config = load_config(path);
+            match packages.iter().find(|(name, _)| *name == config.package) {
+                None => {
+                    eprintln!("unknown package '{}'. Use -l to list.", config.package);
                     std::process::exit(1);
-                });
-                f(&dir, args.common, extra);
+                }
+                Some((_, f)) => f(&config.dir, config.common, config.extra_vec()),
             }
-        },
+        }
     }
 }

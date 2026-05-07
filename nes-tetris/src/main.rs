@@ -1,23 +1,8 @@
-use clap::Parser;
-use eevee_eval::CommonArgs;
-
-#[derive(Parser)]
-#[command(about = "NES Tetris NEAT evolver")]
-struct Args {
-    /// Directory to load and save genomes
-    dir: String,
-    #[command(flatten)]
-    common: CommonArgs,
-}
-
 fn main() {
-    // Args after `--` are passed to the scenario for seed/level/etc.
-    let all: Vec<String> = std::env::args().collect();
-    let sep = all.iter().position(|a| a == "--");
-    let (head, extra) = match sep {
-        Some(i) => (all[..i].to_vec(), all[i + 1..].to_vec()),
-        None => (all, vec![]),
-    };
-    let args = Args::parse_from(head);
-    eevee_eval::scenarios::nes::run(&args.dir, args.common, extra);
+    let path = std::env::args().nth(1).unwrap_or_else(|| {
+        eprintln!("usage: nes-tetris <config.yaml>");
+        std::process::exit(1);
+    });
+    let config = eevee_eval::load_config(&path);
+    eevee_eval::scenarios::nes::run(&config.dir, config.common, config.extra_vec());
 }

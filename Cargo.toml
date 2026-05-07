@@ -6,6 +6,8 @@ resolver = "2"
 eevee = { path = "../eevee" }
 nes_rust_slim = "~0.2"
 clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
 
 [package]
 name = "eevee-eval"
@@ -26,6 +28,8 @@ nes_rust_slim.workspace = true
 rand = "~0.9"
 board-game = "~0.8"
 internal-iterator = "~0.2"
+serde.workspace = true
+serde_yaml.workspace = true
 
 [dependencies.rayon]
 version = "~1.10"
