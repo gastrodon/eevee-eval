@@ -349,7 +349,10 @@ pub fn cli_run(packages: &[(&'static str, fn(&str, CommonArgs, Vec<String>))]) {
                     eprintln!("unknown package '{}'. Use -l to list.", config.package);
                     std::process::exit(1);
                 }
-                Some((_, f)) => f(&config.dir, config.common, config.extra_vec()),
+                Some((_, f)) => {
+                    let extra = config.extra_vec();
+                    f(&config.dir, config.common, extra)
+                }
             }
         }
     }
