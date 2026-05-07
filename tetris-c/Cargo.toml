@@ -1,0 +1,11 @@
+[package]
+name = "tetris-c"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap.workspace = true
+eevee-eval = { path = ".." }
+
+[features]
+parallel = ["eevee-eval/parallel"]

@@ -1,0 +1,38 @@
+[workspace]
+members = ["nes-tetris", "tetris-c"]
+resolver = "2"
+
+[workspace.dependencies]
+eevee = { path = "../eevee" }
+nes_rust_slim = "~0.2"
+clap = { version = "4", features = ["derive"] }
+
+[package]
+name = "eevee-eval"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "eevee-eval"
+path = "src/main.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+clap.workspace = true
+eevee = { workspace = true, features = ["serialize_json"] }
+nes_rust_slim.workspace = true
+rand = "~0.9"
+board-game = "~0.8"
+internal-iterator = "~0.2"
+
+[dependencies.rayon]
+version = "~1.10"
+optional = true
+
+[build-dependencies]
+cc = "1"
+
+[features]
+parallel = ["eevee/parallel", "dep:rayon"]
