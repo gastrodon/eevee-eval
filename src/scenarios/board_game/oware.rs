@@ -176,10 +176,64 @@ impl<A: Fn(f64) -> f64> Scenario<C, G, A> for OwareScenario {
     }
 }
 
+const OWARE_DIGITS: [char; 10] = ['🯰', '🯱', '🯲', '🯳', '🯴', '🯵', '🯶', '🯷', '🯸', '🯹'];
+const OWARE_OVER: char = '🮯';
+
+fn oware_digit(n: u32) -> char {
+    if n <= 9 { OWARE_DIGITS[n as usize] } else { OWARE_OVER }
+}
+
+fn render_oware(board: &Game) {
+    print!("\x1b[H");
+    // B's pits reversed (traditional mancala layout: B faces A across the board)
+    print!("B ");
+    for i in (0..PITS).rev() {
+        print!("{}", oware_digit(board.get_seeds(Player::B, i) as u32));
+    }
+    println!(" {}", oware_digit(board.score(Player::B) as u32));
+    // A's pits forward
+    print!("A ");
+    for i in 0..PITS {
+        print!("{}", oware_digit(board.get_seeds(Player::A, i) as u32));
+    }
+    println!(" {}", oware_digit(board.score(Player::A) as u32));
+    println!();
+}
+
+fn run_exhibition_game(genome: &G) {
+    use eevee::network::activate::steep_sigmoid;
+    let mut board = Game::default();
+    let mut net_a: Continuous = genome.network();
+    let mut net_b: Continuous = genome.network();
+    net_a.flush();
+    net_b.flush();
+    render_oware(&board);
+    let mut plies = 0usize;
+    while !board.is_done() && plies < MAX_PLIES {
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        let mover = board.next_player();
+        let net = if mover == Player::A { &mut net_a } else { &mut net_b };
+        match network_move(net, &board, mover, &steep_sigmoid) {
+            Some(pit) => {
+                board.play(pit).ok();
+                plies += 1;
+            }
+            None => break,
+        }
+        render_oware(&board);
+    }
+    std::thread::sleep(std::time::Duration::from_secs(2));
+}
+
 pub fn run(dir: &str, common: CommonArgs, _extra: Vec<String>) {
     use eevee::random::seed_urandom;
     let base_seed = seed_urandom().unwrap();
     let pool = Arc::new(RwLock::new(vec![]));
     let scenario = OwareScenario::new(Arc::clone(&pool), base_seed);
-    board_game_run(scenario, pool, dir, common);
+    let watch_fn: Option<Box<dyn Fn(&G) + Send + 'static>> = if common.watch {
+        Some(Box::new(|genome: &G| run_exhibition_game(genome)))
+    } else {
+        None
+    };
+    board_game_run(scenario, pool, dir, common, watch_fn);
 }

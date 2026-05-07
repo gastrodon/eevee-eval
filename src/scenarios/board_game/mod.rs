@@ -16,7 +16,7 @@ use eevee::{
 };
 use std::{
     fs::create_dir_all,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
 };
 
 pub type C = WConnection;
@@ -63,6 +63,7 @@ pub fn board_game_run<
     pool: Arc<RwLock<Vec<G>>>,
     dir: &str,
     common: CommonArgs,
+    watch_fn: Option<Box<dyn Fn(&G) + Send + 'static>>,
 ) {
     create_dir_all(dir).expect("failed to create genome output directory");
 
@@ -70,20 +71,44 @@ pub fn board_game_run<
     let init = population_from_files(dir)
         .unwrap_or_else(|_| population_init::<C, G>(inputs, outputs, common.population));
 
+    let watch = common.watch;
     let until_generation = common.until_generation;
     let until_fitness = common.until_fitness;
     let report_every = common.report_every;
     let dir_owned = dir.to_owned();
     let pool_for_save = Arc::clone(&pool);
 
+    let best: Arc<Mutex<Option<G>>> = Arc::new(Mutex::new(None));
+
+    if watch {
+        if let Some(f) = watch_fn {
+            let slot = Arc::clone(&best);
+            std::thread::spawn(move || {
+                print!("\x1b[2J\x1b[H");
+                loop {
+                    let genome = slot.lock().unwrap().clone();
+                    if let Some(g) = genome {
+                        f(&g);
+                    }
+                }
+            });
+        }
+    }
+
+    let hook_best = Arc::clone(&best);
     let save_hook: Hook<C, G> = Box::new(move |stats: &mut Stats<'_, C, G>| {
+        if watch {
+            if let Some((genome, _)) = stats.species.first().and_then(|s| s.members.first()) {
+                *hook_best.lock().unwrap() = Some(genome.clone());
+            }
+        }
         if stats.generation % report_every == 0 {
             if let Some((_, f)) = stats.fittest() {
                 let hall_size = pool_for_save.read().unwrap().len();
-                println!(
+                crate::print_stat(watch, &format!(
                     "gen {} best: {:.4} | hall {}",
                     stats.generation, f, hall_size
-                );
+                ));
                 population_to_files(&dir_owned, stats.species).unwrap();
             }
         }

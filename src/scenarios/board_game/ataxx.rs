@@ -195,10 +195,64 @@ impl<A: Fn(f64) -> f64> Scenario<C, G, A> for AtaxxScenario {
     }
 }
 
+fn render_ataxx(board: &AtaxxBoard) {
+    print!("\x1b[H");
+    for y in 0..BOARD_SIZE {
+        for x in 0..BOARD_SIZE {
+            if x > 0 {
+                print!(" ");
+            }
+            let coord = Coord8::from_xy(x, y);
+            let ch = if !board.valid_coord(coord) {
+                '■'
+            } else {
+                match board.tile(coord) {
+                    Some(p) if p == Player::A => '░',
+                    Some(_) => '▓',
+                    None => '·',
+                }
+            };
+            print!("{}", ch);
+        }
+        println!();
+    }
+    println!();
+}
+
+fn run_exhibition_game(genome: &G) {
+    use eevee::network::activate::steep_sigmoid;
+    let mut board = AtaxxBoard::diagonal(BOARD_SIZE);
+    let mut net_a: Continuous = genome.network();
+    let mut net_b: Continuous = genome.network();
+    net_a.flush();
+    net_b.flush();
+    render_ataxx(&board);
+    let mut plies = 0usize;
+    while !board.is_done() && plies < 200 {
+        std::thread::sleep(std::time::Duration::from_millis(400));
+        let mover = board.next_player();
+        let net = if mover == Player::A { &mut net_a } else { &mut net_b };
+        match network_move(net, &board, mover, &steep_sigmoid) {
+            Some(mv) => {
+                board.play(mv).ok();
+                plies += 1;
+            }
+            None => break,
+        }
+        render_ataxx(&board);
+    }
+    std::thread::sleep(std::time::Duration::from_secs(2));
+}
+
 pub fn run(dir: &str, common: CommonArgs, _extra: Vec<String>) {
     use eevee::random::seed_urandom;
     let base_seed = seed_urandom().unwrap();
     let pool = Arc::new(RwLock::new(vec![]));
     let scenario = AtaxxScenario::new(Arc::clone(&pool), base_seed);
-    board_game_run(scenario, pool, dir, common);
+    let watch_fn: Option<Box<dyn Fn(&G) + Send + 'static>> = if common.watch {
+        Some(Box::new(|genome: &G| run_exhibition_game(genome)))
+    } else {
+        None
+    };
+    board_game_run(scenario, pool, dir, common, watch_fn);
 }
