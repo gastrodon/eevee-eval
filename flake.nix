@@ -87,11 +87,7 @@ exclude = ["eevee"]'
       {
         packages = {
           default = mkPkg { };
-          tetris-c = mkPkg { cargoExtraArgs = "-p tetris-c"; };
           parallel = mkPkg { cargoExtraArgs = "--features parallel"; };
-          tetris-c-parallel = mkPkg {
-            cargoExtraArgs = "-p tetris-c --features parallel";
-          };
         };
 
         devShells.default = craneLib.devShell { };
