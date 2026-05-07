@@ -1,20 +1,16 @@
-use super::{board_game_run, C, G};
+use super::{board_game_run, CoEvolGame, CoEvolScenario, C, G};
 use crate::CommonArgs;
 use board_game::board::{Board, BoardMoves, Outcome, Player};
 use board_game::games::ataxx::{AtaxxBoard, Move};
 use board_game::util::coord::Coord8;
 use eevee::{
     network::{Continuous, Network, ToNetwork},
-    Scenario,
+    random::WyRng,
 };
 use internal_iterator::InternalIterator;
 use rand::{Rng, RngCore};
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc, RwLock,
-};
+use std::sync::{Arc, RwLock};
 
-const GAMES_PER_EVAL: usize = 2;
 const NETWORK_PREC: usize = 20;
 
 const BOARD_SIZE: u8 = 7;
@@ -145,53 +141,19 @@ fn play_game<A: Fn(f64) -> f64>(
     }
 }
 
-struct AtaxxScenario {
-    pool: Arc<RwLock<Vec<G>>>,
-    seed_counter: AtomicU64,
-}
+pub struct AtaxxGame;
 
-impl AtaxxScenario {
-    fn new(pool: Arc<RwLock<Vec<G>>>, base_seed: u64) -> Self {
-        Self { pool, seed_counter: AtomicU64::new(base_seed) }
-    }
-}
-
-impl<A: Fn(f64) -> f64> Scenario<C, G, A> for AtaxxScenario {
-    fn io(&self) -> (usize, usize) {
-        (INPUT_DIM, OUTPUT_DIM)
-    }
-
-    fn eval(&self, genome: &G, σ: &A) -> f64 {
-        use eevee::random::WyRng;
-        let seed = self.seed_counter.fetch_add(1, Ordering::Relaxed);
-        let mut rng = WyRng::seeded(seed);
-
-        let opponents: Vec<G> = {
-            let pool = self.pool.read().unwrap();
-            if pool.is_empty() {
-                vec![]
-            } else {
-                (0..GAMES_PER_EVAL)
-                    .map(|_| pool[rng.random_range(0..pool.len())].clone())
-                    .collect()
-            }
-        };
-
-        let mut learner = genome.network();
-        let mut total = 0.0;
-
-        for i in 0..GAMES_PER_EVAL {
-            let learner_player = if i % 2 == 0 { Player::A } else { Player::B };
-            let score = if opponents.is_empty() {
-                play_game(&mut learner, learner_player, None, σ, &mut rng)
-            } else {
-                let mut opp = opponents[i % opponents.len()].network();
-                play_game(&mut learner, learner_player, Some(&mut opp), σ, &mut rng)
-            };
-            total += score;
-        }
-
-        total / GAMES_PER_EVAL as f64
+impl CoEvolGame for AtaxxGame {
+    const GAMES_PER_EVAL: usize = 2;
+    fn io() -> (usize, usize) { (INPUT_DIM, OUTPUT_DIM) }
+    fn play<A: Fn(f64) -> f64>(
+        learner: &mut Continuous,
+        learner_player: Player,
+        opponent: Option<&mut Continuous>,
+        σ: &A,
+        rng: &mut WyRng,
+    ) -> f64 {
+        play_game(learner, learner_player, opponent, σ, rng)
     }
 }
 
@@ -248,7 +210,7 @@ pub fn run(dir: &str, common: CommonArgs, _extra: Vec<String>) {
     use eevee::random::seed_urandom;
     let base_seed = seed_urandom().unwrap();
     let pool = Arc::new(RwLock::new(vec![]));
-    let scenario = AtaxxScenario::new(Arc::clone(&pool), base_seed);
+    let scenario = CoEvolScenario::<AtaxxGame>::new(Arc::clone(&pool), base_seed);
     let watch_fn: Option<Box<dyn Fn(&G) + Send + 'static>> = if common.watch {
         Some(Box::new(|genome: &G| run_exhibition_game(genome)))
     } else {

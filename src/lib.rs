@@ -22,18 +22,39 @@ use std::{
 
 pub use eevee::scenario::{Hook, Stats};
 
-pub fn report_generation(generation: usize, fittest: f64, species_sizes: &[usize], hall: Option<usize>) {
+pub fn report_generation(
+    generation: usize,
+    fittest: f64,
+    species_sizes: &[usize],
+    hall: Option<usize>,
+    stale: Option<usize>,
+) {
     let total: usize = species_sizes.iter().sum();
     let shares: Vec<String> = species_sizes
         .iter()
         .map(|&n| format!("{}%", (n * 100) / total.max(1)))
         .collect();
     let hall_str = hall
-        .map(|h| format!("  hall {}/{}", h, crate::scenarios::board_game::HALL_OF_FAME_MAX))
+        .map(|h| {
+            format!(
+                "  hall {}/{}",
+                h,
+                crate::scenarios::board_game::HALL_OF_FAME_MAX
+            )
+        })
+        .unwrap_or_default();
+    let stale_str = stale
+        .filter(|&s| s > 0)
+        .map(|s| format!("  stale: {}", s))
         .unwrap_or_default();
     eprintln!(
-        "gen {} best: {:.3}  species: {}  [{}]{}",
-        generation, fittest, species_sizes.len(), shares.join(", "), hall_str
+        "gen {} best: {:.3}  species: {}  [{}]{}{}",
+        generation,
+        fittest,
+        species_sizes.len(),
+        shares.join(", "),
+        hall_str,
+        stale_str
     );
 }
 
@@ -192,7 +213,7 @@ pub fn run<
             return ControlFlow::Continue(());
         };
         let sizes: Vec<usize> = stats.species.iter().map(|s| s.members.len()).collect();
-        crate::report_generation(stats.generation, *fittest.1, &sizes, None);
+        crate::report_generation(stats.generation, fittest.1, &sizes, None, None);
         population_to_files(&dir, stats.species).unwrap();
 
         if stats.generation >= until_generation {

@@ -4,23 +4,103 @@ pub mod oware;
 pub mod ttt;
 
 use crate::{CommonArgs, Hook, Stats};
+use board_game::board::Player;
 use core::ops::ControlFlow;
 use eevee::{
     genome::{Recurrent, WConnection},
-    network::activate::steep_sigmoid,
+    network::{activate::steep_sigmoid, Continuous, ToNetwork},
     population::population_init,
     random::{seed_urandom, WyRng},
     scenario::{evolve, EvolutionHooks},
     serialize::{population_from_files, population_to_files},
     Scenario,
 };
+use rand::Rng;
 use std::{
     fs::create_dir_all,
-    sync::{Arc, Mutex, RwLock},
+    marker::PhantomData,
+    sync::{
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+        Arc, Mutex, RwLock,
+    },
 };
 
 pub type C = WConnection;
 pub type G = Recurrent<C>;
+
+// ---------------------------------------------------------------------------
+// Co-evolution scenario trait
+// ---------------------------------------------------------------------------
+
+/// Game-specific logic for a co-evolutionary board-game scenario.
+///
+/// Implement this on a unit struct; `CoEvolScenario<T>` provides the full
+/// `Scenario` impl (pool sampling, alternating sides, averaging) for free.
+pub trait CoEvolGame {
+    const GAMES_PER_EVAL: usize;
+    fn io() -> (usize, usize);
+    fn play<A: Fn(f64) -> f64>(
+        learner: &mut Continuous,
+        learner_player: Player,
+        opponent: Option<&mut Continuous>,
+        σ: &A,
+        rng: &mut WyRng,
+    ) -> f64;
+}
+
+pub struct CoEvolScenario<T: CoEvolGame> {
+    pub pool: Arc<RwLock<Vec<G>>>,
+    seed_counter: AtomicU64,
+    _game: PhantomData<fn() -> T>,
+}
+
+impl<T: CoEvolGame> CoEvolScenario<T> {
+    pub fn new(pool: Arc<RwLock<Vec<G>>>, base_seed: u64) -> Self {
+        Self {
+            pool,
+            seed_counter: AtomicU64::new(base_seed),
+            _game: PhantomData,
+        }
+    }
+}
+
+impl<T: CoEvolGame, A: Fn(f64) -> f64> Scenario<C, G, A> for CoEvolScenario<T> {
+    fn io(&self) -> (usize, usize) {
+        T::io()
+    }
+
+    fn eval(&self, genome: &G, σ: &A) -> f64 {
+        let seed = self.seed_counter.fetch_add(1, Ordering::Relaxed);
+        let mut rng = WyRng::seeded(seed);
+
+        let opponents: Vec<G> = {
+            let pool = self.pool.read().unwrap();
+            if pool.is_empty() {
+                vec![]
+            } else {
+                (0..T::GAMES_PER_EVAL)
+                    .map(|_| pool[rng.random_range(0..pool.len())].clone())
+                    .collect()
+            }
+        };
+
+        let mut learner = genome.network();
+        let mut total = 0.0;
+
+        for i in 0..T::GAMES_PER_EVAL {
+            let learner_player = if i % 2 == 0 { Player::A } else { Player::B };
+            let score = if opponents.is_empty() {
+                T::play(&mut learner, learner_player, None, σ, &mut rng)
+            } else {
+                let mut opp = opponents[i % opponents.len()].network();
+                T::play(&mut learner, learner_player, Some(&mut opp), σ, &mut rng)
+            };
+            total += score;
+        }
+
+        total / T::GAMES_PER_EVAL as f64
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Hall-of-fame management hook
@@ -54,10 +134,8 @@ pub fn refresh_hook(
 /// Handles population init / resume, file saving, reporting, and termination.
 /// Each game creates its scenario + pool and calls this.
 pub fn board_game_run<
-    #[cfg(not(feature = "parallel"))]
-    S: Scenario<C, G, fn(f64) -> f64>,
-    #[cfg(feature = "parallel")]
-    S: Scenario<C, G, fn(f64) -> f64> + Sync,
+    #[cfg(not(feature = "parallel"))] S: Scenario<C, G, fn(f64) -> f64>,
+    #[cfg(feature = "parallel")] S: Scenario<C, G, fn(f64) -> f64> + Sync,
 >(
     scenario: S,
     pool: Arc<RwLock<Vec<G>>>,
@@ -96,17 +174,34 @@ pub fn board_game_run<
     }
 
     let hook_best = Arc::clone(&best);
+    let last_best = AtomicU64::new(f64::NEG_INFINITY.to_bits());
+    let stale = AtomicUsize::new(0);
     let save_hook: Hook<C, G> = Box::new(move |stats: &mut Stats<'_, C, G>| {
         if watch {
             if let Some((genome, _)) = stats.species.first().and_then(|s| s.members.first()) {
                 *hook_best.lock().unwrap() = Some(genome.clone());
             }
         }
+        if let Some((_, f)) = stats.fittest() {
+            let prev = f64::from_bits(last_best.load(Ordering::Relaxed));
+            if *f > prev {
+                last_best.store(f.to_bits(), Ordering::Relaxed);
+                stale.store(0, Ordering::Relaxed);
+            } else {
+                stale.fetch_add(1, Ordering::Relaxed);
+            }
+        }
         if stats.generation % report_every == 0 {
             if let Some((_, f)) = stats.fittest() {
                 let hall_size = pool_for_save.read().unwrap().len();
                 let sizes: Vec<usize> = stats.species.iter().map(|s| s.members.len()).collect();
-                crate::report_generation(stats.generation, *f, &sizes, Some(hall_size));
+                crate::report_generation(
+                    stats.generation,
+                    *f,
+                    &sizes,
+                    Some(hall_size),
+                    Some(stale.load(Ordering::Relaxed)),
+                );
                 population_to_files(&dir_owned, stats.species).unwrap();
             }
         }
