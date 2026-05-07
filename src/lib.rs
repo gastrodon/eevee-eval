@@ -17,7 +17,7 @@ use eevee::{
 use serde::Deserialize;
 use std::{
     fs::create_dir_all,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
 };
 
 pub use eevee::scenario::{Hook, Stats};
@@ -200,7 +200,8 @@ pub fn load_config(path: &str) -> Config {
     })
 }
 
-type WatchFn<G> = dyn Fn(&G) + Send + 'static;
+pub type WatchFn<G> = dyn Fn(&G) + Send + 'static;
+pub type Pool<G> = Arc<RwLock<Vec<G>>>;
 
 pub fn run<
     C: Connection,

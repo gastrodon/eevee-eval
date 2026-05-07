@@ -1,4 +1,5 @@
 use super::{board_game_run, CoEvolGame, CoEvolScenario, C, G};
+use crate::WatchFn;
 use crate::CommonArgs;
 use board_game::board::{Board, Outcome, Player};
 use board_game::games::connect4::Connect4;
@@ -208,7 +209,7 @@ pub fn run(dir: &str, common: CommonArgs, _extra: Vec<String>) {
     let base_seed = seed_urandom().unwrap();
     let pool = Arc::new(RwLock::new(vec![]));
     let scenario = CoEvolScenario::<Connect4Game, N>::new(Arc::clone(&pool), base_seed);
-    let watch_fn: Option<Box<dyn Fn(&G) + Send + 'static>> = if common.watch {
+    let watch_fn: Option<Box<WatchFn<G>>> = if common.watch {
         Some(Box::new(|genome: &G| run_exhibition_game::<N>(genome)))
     } else {
         None

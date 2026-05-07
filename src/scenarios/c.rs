@@ -1,7 +1,7 @@
 use crate::{
     draw_output, render_frame,
     tetris::{draw_footer, next_seed, update_watch, TetrisEngine, TetrisScenario, BOARD_SIZE},
-    CommonArgs, Hook, Stats,
+    CommonArgs, Hook, Stats, WatchFn,
 };
 use clap::Parser;
 use core::ops::ControlFlow;
@@ -162,7 +162,7 @@ pub fn run(dir: &str, common: CommonArgs, extra: Vec<String>) {
         ControlFlow::Continue(())
     });
 
-    let watch_fn: Option<Box<dyn Fn(&G) + Send + 'static>> = if watch {
+    let watch_fn: Option<Box<WatchFn<G>>> = if watch {
         Some(Box::new(move |genome| {
             run_exhibition_game::<C, G, N>(genome.clone(), next_seed(), level)
         }))

@@ -3,7 +3,7 @@ pub mod connect4;
 pub mod oware;
 pub mod ttt;
 
-use crate::{CommonArgs, Hook, Stats};
+use crate::{CommonArgs, Hook, Pool, Stats, WatchFn};
 use board_game::board::Player;
 use core::ops::ControlFlow;
 use eevee::{
@@ -21,7 +21,7 @@ use std::{
     marker::PhantomData,
     sync::{
         atomic::{AtomicU64, AtomicUsize, Ordering},
-        Arc, Mutex, RwLock,
+        Arc, Mutex,
     },
 };
 
@@ -49,14 +49,14 @@ pub trait CoEvolGame {
 }
 
 pub struct CoEvolScenario<T, NN> {
-    pub pool: Arc<RwLock<Vec<G>>>,
+    pub pool: Pool<G>,
     seed_counter: AtomicU64,
     _game: PhantomData<fn() -> T>,
     _network: PhantomData<fn() -> NN>,
 }
 
 impl<T: CoEvolGame, NN> CoEvolScenario<T, NN> {
-    pub fn new(pool: Arc<RwLock<Vec<G>>>, base_seed: u64) -> Self {
+    pub fn new(pool: Pool<G>, base_seed: u64) -> Self {
         Self {
             pool,
             seed_counter: AtomicU64::new(base_seed),
@@ -110,9 +110,7 @@ impl<T: CoEvolGame, NN: Network + FromGenome<C, G>, A: Fn(f64) -> f64> Scenario<
 
 pub const HALL_OF_FAME_MAX: usize = 64;
 
-pub fn refresh_hook(
-    pool: Arc<RwLock<Vec<G>>>,
-) -> Box<dyn Fn(&mut Stats<'_, C, G>) -> ControlFlow<()>> {
+pub fn refresh_hook(pool: Pool<G>) -> Hook<C, G> {
     Box::new(move |stats| {
         if let Some((g, _)) = stats.fittest() {
             let champ = g.clone();
@@ -140,10 +138,10 @@ pub fn board_game_run<
     #[cfg(feature = "parallel")] S: Scenario<C, G, fn(f64) -> f64> + Sync,
 >(
     scenario: S,
-    pool: Arc<RwLock<Vec<G>>>,
+    pool: Pool<G>,
     dir: &str,
     common: CommonArgs,
-    watch_fn: Option<Box<dyn Fn(&G) + Send + 'static>>,
+    watch_fn: Option<Box<WatchFn<G>>>,
 ) {
     create_dir_all(dir).expect("failed to create genome output directory");
 

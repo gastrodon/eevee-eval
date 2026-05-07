@@ -1,4 +1,4 @@
-use crate::{draw_output, render_frame, tetris::update_watch, CommonArgs, Hook, Stats};
+use crate::{draw_output, render_frame, tetris::update_watch, CommonArgs, Hook, Stats, WatchFn};
 use clap::Parser;
 use core::ops::ControlFlow;
 use eevee::{
@@ -306,7 +306,7 @@ pub fn run(dir: &str, common: CommonArgs, extra: Vec<String>) {
         ControlFlow::Continue(())
     });
 
-    let watch_fn: Option<Box<dyn Fn(&G) + Send + 'static>> = if watch {
+    let watch_fn: Option<Box<WatchFn<G>>> = if watch {
         Some(Box::new(move |genome| run_exhibition::<_, _, NN>(genome.clone())))
     } else {
         None
