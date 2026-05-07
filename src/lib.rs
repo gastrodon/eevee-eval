@@ -5,7 +5,6 @@ pub mod scenarios;
 pub mod tetris;
 
 use core::ops::ControlFlow;
-use serde::Deserialize;
 use eevee::{
     activate::relu,
     genome::Genome,
@@ -15,6 +14,7 @@ use eevee::{
     serialize::{population_from_files, population_to_files},
     Connection, Scenario, SerializeFile,
 };
+use serde::Deserialize;
 use std::{
     fs::create_dir_all,
     sync::{Arc, Mutex},
@@ -171,34 +171,24 @@ impl CommonArgs {
 /// values documented on [`CommonArgs`].
 #[derive(Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct Config {
     pub package: String,
     pub dir: String,
-    /// Scenario-specific arguments as a single string (e.g. `"--seed 0 --level 3"`).
     pub extra: String,
     #[serde(flatten)]
     pub common: CommonArgs,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            package: String::new(),
-            dir: String::new(),
-            extra: String::new(),
-            common: CommonArgs::default(),
-        }
-    }
-}
-
 impl Config {
-    /// Split `extra` on whitespace into a `Vec<String>` suitable for passing to a scenario.
     pub fn extra_vec(&self) -> Vec<String> {
-        self.extra.split_whitespace().map(|s| s.to_owned()).collect()
+        self.extra
+            .split_whitespace()
+            .map(|s| s.to_owned())
+            .collect()
     }
 }
 
-/// Read and parse a YAML config file, exiting on error.
 pub fn load_config(path: &str) -> Config {
     let text = std::fs::read_to_string(path).unwrap_or_else(|e| {
         eprintln!("error reading '{}': {}", path, e);
@@ -209,10 +199,6 @@ pub fn load_config(path: &str) -> Config {
         std::process::exit(1);
     })
 }
-
-// ---------------------------------------------------------------------------
-// Generic evolve runner
-// ---------------------------------------------------------------------------
 
 type WatchFn<G> = dyn Fn(&G) + Send + 'static;
 
@@ -325,9 +311,7 @@ pub fn run<
     );
 }
 
-// ---------------------------------------------------------------------------
-// Unified CLI dispatcher
-// ---------------------------------------------------------------------------
+type EvalRunnable = (&'static str, fn(&str, CommonArgs, Vec<String>));
 
 /// Dispatch to a named scenario package from a YAML config file.
 ///
@@ -335,7 +319,7 @@ pub fn run<
 /// eevee-eval run.yaml
 /// eevee-eval -l
 /// ```
-pub fn cli_run(packages: &[(&'static str, fn(&str, CommonArgs, Vec<String>))]) {
+pub fn cli_run(packages: &[EvalRunnable]) {
     match std::env::args().nth(1).as_deref() {
         None | Some("-l") | Some("--list") => {
             for (name, _) in packages {
@@ -349,7 +333,10 @@ pub fn cli_run(packages: &[(&'static str, fn(&str, CommonArgs, Vec<String>))]) {
                     eprintln!("unknown package '{}'. Use -l to list.", config.package);
                     std::process::exit(1);
                 }
-                Some((_, f)) => f(&config.dir, config.common, config.extra_vec()),
+                Some((_, f)) => {
+                    let extra = config.extra_vec();
+                    f(&config.dir, config.common, extra)
+                }
             }
         }
     }

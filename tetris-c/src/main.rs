@@ -4,5 +4,6 @@ fn main() {
         std::process::exit(1);
     });
     let config = eevee_eval::load_config(&path);
-    eevee_eval::scenarios::c::run(&config.dir, config.common, config.extra_vec());
+    let common = config.extra_vec();
+    eevee_eval::scenarios::c::run(&config.dir, config.common, common);
 }
