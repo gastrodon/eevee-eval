@@ -35,8 +35,13 @@ serde_yaml.workspace = true
 version = "~1.10"
 optional = true
 
+[dependencies.minifb]
+version = "0.27"
+optional = true
+
 [build-dependencies]
 cc = "1"
 
 [features]
 parallel = ["eevee/parallel", "dep:rayon"]
+x11nes = ["dep:minifb"]
