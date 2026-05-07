@@ -1,6 +1,6 @@
 package: nes-mario
 dir: ./eval/nes-super-mario
-until_generation: 40
+until_generation: 400
 population: 100
 report_every: 1
 watch: true
