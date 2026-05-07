@@ -22,21 +22,19 @@ use std::{
 
 pub use eevee::scenario::{Hook, Stats};
 
-pub fn report_generation(generation: usize, fittest: f64, species_sizes: &[usize], extra: Option<&str>) {
+pub fn report_generation(generation: usize, fittest: f64, species_sizes: &[usize], hall: Option<usize>) {
     let total: usize = species_sizes.iter().sum();
     let shares: Vec<String> = species_sizes
         .iter()
         .map(|&n| format!("{}%", (n * 100) / total.max(1)))
         .collect();
-    let mut line = format!(
-        "gen {} best: {:.3}  species: {}  [{}]",
-        generation, fittest, species_sizes.len(), shares.join(", ")
+    let hall_str = hall
+        .map(|h| format!("  hall {}/{}", h, crate::scenarios::board_game::HALL_OF_FAME_MAX))
+        .unwrap_or_default();
+    eprintln!(
+        "gen {} best: {:.3}  species: {}  [{}]{}",
+        generation, fittest, species_sizes.len(), shares.join(", "), hall_str
     );
-    if let Some(e) = extra {
-        line.push_str("  ");
-        line.push_str(e);
-    }
-    eprintln!("{}", line);
 }
 
 // ---------------------------------------------------------------------------

@@ -26,7 +26,7 @@ pub type G = Recurrent<C>;
 // Hall-of-fame management hook
 // ---------------------------------------------------------------------------
 
-const HALL_OF_FAME_MAX: usize = 64;
+pub const HALL_OF_FAME_MAX: usize = 64;
 
 pub fn refresh_hook(
     pool: Arc<RwLock<Vec<G>>>,
@@ -106,7 +106,7 @@ pub fn board_game_run<
             if let Some((_, f)) = stats.fittest() {
                 let hall_size = pool_for_save.read().unwrap().len();
                 let sizes: Vec<usize> = stats.species.iter().map(|s| s.members.len()).collect();
-                crate::report_generation(stats.generation, *f, &sizes, Some(&format!("hall {}", hall_size)));
+                crate::report_generation(stats.generation, *f, &sizes, Some(hall_size));
                 population_to_files(&dir_owned, stats.species).unwrap();
             }
         }
