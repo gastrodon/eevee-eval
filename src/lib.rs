@@ -182,7 +182,7 @@ pub fn run<
             .iter()
             .map(|s| format!("{}%", (s.members.len() * 100) / total.max(1)))
             .collect();
-        println!(
+        eprintln!(
             "gen {} best: {:.3}  species: {}  [{}]",
             stats.generation,
             fittest.1,
