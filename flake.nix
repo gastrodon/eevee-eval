@@ -83,11 +83,24 @@ exclude = ["eevee"]'
             // extra
           );
 
+        x11Libs = with pkgs; [
+          libx11
+          libxi
+          libxrandr
+          libxinerama
+          libxcursor
+        ];
+
       in
       {
         packages = {
           default = mkPkg { };
           parallel = mkPkg { cargoExtraArgs = "--features parallel"; };
+          x11nes = mkPkg {
+            cargoExtraArgs = "--features x11nes";
+            buildInputs = x11Libs;
+            nativeBuildInputs = [ pkgs.pkg-config ];
+          };
         };
 
         devShells.default = craneLib.devShell { };

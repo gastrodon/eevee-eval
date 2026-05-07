@@ -191,12 +191,50 @@ fn draw_mario_footer(progress: f64) {
     println!("|{}{}{}|", left, " ".repeat(spaces), right);
 }
 
+#[cfg(feature = "x11nes")]
+struct WinState {
+    window: minifb::Window,
+    rgba: Vec<u8>,
+    fb: Vec<u32>,
+}
+
+#[cfg(feature = "x11nes")]
+impl WinState {
+    fn new() -> Self {
+        Self {
+            window: minifb::Window::new(
+                "Super Mario Bros (NES)",
+                256,
+                240,
+                minifb::WindowOptions { scale: minifb::Scale::X2, ..Default::default() },
+            ).expect("failed to open NES window"),
+            rgba: vec![0u8; 256 * 240 * 4],
+            fb: vec![0u32; 256 * 240],
+        }
+    }
+}
+
+#[cfg(feature = "x11nes")]
+thread_local! {
+    static WIN: std::cell::RefCell<Option<WinState>> = std::cell::RefCell::new(None);
+}
+
 fn run_exhibition(genome: &Recurrent<WConnection>) {
     let mut nes = make_nes();
     let mut network: Continuous = genome.network();
     let mut sense = [0.0f64; NUM_INPUTS];
     let mut last_progress = mario_progress(&nes.get_cpu().get_ram().data);
     let mut stall = 0usize;
+
+    // Lazily open the window on first evaluation; reuse it for all subsequent ones.
+    #[cfg(feature = "x11nes")]
+    WIN.with(|cell| {
+        let mut opt = cell.borrow_mut();
+        if opt.is_none() {
+            *opt = Some(WinState::new());
+        }
+    });
+
     for _ in 0..3_600 {
         fill_sense(&nes.get_cpu().get_ram().data, &mut sense);
         network.step(1, &sense, &relu);
@@ -210,6 +248,23 @@ fn run_exhibition(genome: &Recurrent<WConnection>) {
         apply_outputs(&mut nes, &outputs);
         nes.step_frame();
         nes.get_mut_cpu().joypad1.buttons = [false; 8];
+
+        #[cfg(feature = "x11nes")]
+        WIN.with(|cell| {
+            if let Some(state) = cell.borrow_mut().as_mut() {
+                if state.window.is_open() {
+                    nes.copy_pixels(&mut state.rgba);
+                    // copy_to_rgba_pixels produces BGRA; minifb wants 0x00RRGGBB
+                    for (i, px) in state.fb.iter_mut().enumerate() {
+                        *px = (state.rgba[i * 4 + 2] as u32) << 16
+                            | (state.rgba[i * 4 + 1] as u32) << 8
+                            | state.rgba[i * 4 + 0] as u32;
+                    }
+                    let _ = state.window.update_with_buffer(&state.fb, 256, 240);
+                }
+            }
+        });
+
         let ram = &nes.get_cpu().get_ram().data;
         if ram[PLAYER_STATUS] != 3 { break; }
         let p = mario_progress(ram);
