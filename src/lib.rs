@@ -32,7 +32,7 @@ pub fn report_generation(
     let total: usize = species_sizes.iter().sum();
     let shares: Vec<String> = species_sizes
         .iter()
-        .map(|&n| format!("{}%", (n * 100) / total.max(1)))
+        .filter_map(|&n| (n != 0).then_some(format!("{}%", (n * 100) / total.max(1))))
         .collect();
     let hall_str = hall
         .map(|h| {
