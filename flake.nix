@@ -101,6 +101,11 @@ exclude = ["eevee"]'
             buildInputs = x11Libs;
             nativeBuildInputs = [ pkgs.pkg-config ];
           };
+          x11nes-parallel = mkPkg {
+            cargoExtraArgs = "--features x11nes,parallel";
+            buildInputs = x11Libs;
+            nativeBuildInputs = [ pkgs.pkg-config ];
+          };
         };
 
         devShells.default = craneLib.devShell { };
