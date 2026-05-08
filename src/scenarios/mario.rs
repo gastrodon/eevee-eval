@@ -149,6 +149,15 @@ where
         let mut sense = [0.0f64; NUM_INPUTS];
         let mut last_progress = mario_progress(&nes.get_cpu().get_ram().data);
         let mut stall = 0usize;
+
+        #[cfg(feature = "x11nes")]
+        WIN.with(|cell| {
+            let mut opt = cell.borrow_mut();
+            if opt.is_none() {
+                *opt = Some(WinState::new());
+            }
+        });
+
         for _ in 0..self.max_frames {
             fill_sense(&nes.get_cpu().get_ram().data, &mut sense);
             network.step(1, &sense, σ);
@@ -156,6 +165,22 @@ where
             apply_outputs(&mut nes, &outputs);
             nes.step_frame();
             nes.get_mut_cpu().joypad1.buttons = [false; 8];
+
+            #[cfg(feature = "x11nes")]
+            WIN.with(|cell| {
+                if let Some(state) = cell.borrow_mut().as_mut() {
+                    if state.window.is_open() {
+                        nes.copy_pixels(&mut state.rgba);
+                        for (i, px) in state.fb.iter_mut().enumerate() {
+                            *px = (state.rgba[i * 4 + 2] as u32) << 16
+                                | (state.rgba[i * 4 + 1] as u32) << 8
+                                | state.rgba[i * 4 + 0] as u32;
+                        }
+                        let _ = state.window.update_with_buffer(&state.fb, 256, 240);
+                    }
+                }
+            });
+
             let ram = &nes.get_cpu().get_ram().data;
             // $0772=3 is in-level play; anything else is dying/transition/game-over
             if ram[PLAYER_STATUS] != 3 {
@@ -228,15 +253,6 @@ fn run_exhibition<C: Connection, G: Genome<C>, NN: Network + FromGenome<C, G>>(g
     let mut sense = [0.0f64; NUM_INPUTS];
     let mut last_progress = mario_progress(&nes.get_cpu().get_ram().data);
     let mut stall = 0usize;
-
-    // Lazily open the window on first evaluation; reuse it for all subsequent ones.
-    #[cfg(feature = "x11nes")]
-    WIN.with(|cell| {
-        let mut opt = cell.borrow_mut();
-        if opt.is_none() {
-            *opt = Some(WinState::new());
-        }
-    });
 
     for _ in 0..3_600 {
         fill_sense(&nes.get_cpu().get_ram().data, &mut sense);
