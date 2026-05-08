@@ -8,10 +8,10 @@ use board_game::board::Player;
 use core::ops::ControlFlow;
 use eevee::{
     genome::{Recurrent, WConnection},
-    network::{activate::steep_sigmoid, Continuous, FromGenome, Network, ToNetwork},
+    network::{activate::steep_sigmoid, FromGenome, Network, ToNetwork},
     population::population_init,
     random::{seed_urandom, WyRng},
-    scenario::{evolve, EvolutionConfig, EvolutionHooks},
+    scenario::{evolve, EvolutionHooks},
     serialize::{population_from_files, population_to_files},
     Scenario,
 };
@@ -66,7 +66,9 @@ impl<T: CoEvolGame, NN> CoEvolScenario<T, NN> {
     }
 }
 
-impl<T: CoEvolGame, NN: Network + FromGenome<C, G>, A: Fn(f64) -> f64> Scenario<C, G, A> for CoEvolScenario<T, NN> {
+impl<T: CoEvolGame, NN: Network + FromGenome<C, G>, A: Fn(f64) -> f64> Scenario<C, G, A>
+    for CoEvolScenario<T, NN>
+{
     fn io(&self) -> (usize, usize) {
         T::io()
     }
@@ -192,7 +194,7 @@ pub fn board_game_run<
                 stale.fetch_add(1, Ordering::Relaxed);
             }
         }
-        if stats.generation % report_every == 0 {
+        if stats.generation.is_multiple_of(report_every) {
             if let Some((_, f)) = stats.fittest() {
                 let hall_size = pool_for_save.read().unwrap().len();
                 let sizes: Vec<usize> = stats.species.iter().map(|s| s.members.len()).collect();

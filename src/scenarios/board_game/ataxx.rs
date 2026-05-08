@@ -1,6 +1,6 @@
 use super::{board_game_run, CoEvolGame, CoEvolScenario, C, G};
-use crate::WatchFn;
 use crate::CommonArgs;
+use crate::WatchFn;
 use board_game::board::{Board, BoardMoves, Outcome, Player};
 use board_game::games::ataxx::{AtaxxBoard, Move};
 use board_game::util::coord::Coord8;
@@ -146,7 +146,9 @@ pub struct AtaxxGame;
 
 impl CoEvolGame for AtaxxGame {
     const GAMES_PER_EVAL: usize = 2;
-    fn io() -> (usize, usize) { (INPUT_DIM, OUTPUT_DIM) }
+    fn io() -> (usize, usize) {
+        (INPUT_DIM, OUTPUT_DIM)
+    }
     fn play<NN: Network, A: Fn(f64) -> f64>(
         learner: &mut NN,
         learner_player: Player,
@@ -194,7 +196,11 @@ fn run_exhibition_game<NN: Network + FromGenome<C, G>>(genome: &G) {
     while !board.is_done() && plies < 200 {
         std::thread::sleep(std::time::Duration::from_millis(400));
         let mover = board.next_player();
-        let net = if mover == Player::A { &mut net_a } else { &mut net_b };
+        let net = if mover == Player::A {
+            &mut net_a
+        } else {
+            &mut net_b
+        };
         match network_move(net, &board, mover, &steep_sigmoid) {
             Some(mv) => {
                 board.play(mv).ok();
