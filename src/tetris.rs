@@ -25,6 +25,7 @@ pub fn next_seed() -> u16 {
     WyRng::seeded(SEED_COUNTER.fetch_add(1, Ordering::Relaxed)).next_u64() as u16
 }
 
+
 pub const BOARD_SIZE: usize = 200;
 
 // ---------------------------------------------------------------------------
@@ -60,14 +61,16 @@ pub trait TetrisEngine {
 pub struct TetrisScenario<E: TetrisEngine> {
     pub level: u8,
     pub games: usize,
+    pub seed: Option<u16>,
     _engine: PhantomData<fn(u16) -> E>,
 }
 
 impl<E: TetrisEngine> TetrisScenario<E> {
-    pub fn new(level: u8, games: usize) -> Self {
+    pub fn new(level: u8, games: usize, seed: Option<u16>) -> Self {
         Self {
             level,
             games,
+            seed,
             _engine: PhantomData,
         }
     }
@@ -87,7 +90,7 @@ where
     fn eval(&self, genome: &G, σ: &A) -> f64 {
         let total: f64 = (0..self.games)
             .map(|_| {
-                let seed = next_seed();
+                let seed = self.seed.unwrap_or_else(next_seed);
                 let mut engine = E::new_game(seed, self.level);
                 let mut network = genome.network();
                 let mut sense = [0.0f64; BOARD_SIZE];

@@ -33,6 +33,9 @@ struct TetrisArgs {
     /// Starting level (0–29; affects drop speed)
     #[arg(long, default_value_t = 0)]
     level: u8,
+    /// Override the RNG seed counter (for reproducible runs)
+    #[arg(long)]
+    seed: Option<u16>,
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +162,7 @@ pub fn run(dir: &str, common: CommonArgs, extra: Vec<String>) {
     let watch = common.watch;
     let games = targs.games;
     let level = targs.level;
+    let seed = targs.seed;
 
     let watch_hook: Hook<C, G> = Box::new(|stats: &mut Stats<C, G>| {
         let max = stats.fittest().map(|(_, f)| *f).unwrap_or(0.0);
@@ -168,14 +172,14 @@ pub fn run(dir: &str, common: CommonArgs, extra: Vec<String>) {
 
     let watch_fn: Option<Box<WatchFn<G>>> = if watch {
         Some(Box::new(move |genome| {
-            run_exhibition_game::<C, G, NN>(genome.clone(), next_seed(), level)
+            run_exhibition_game::<C, G, NN>(genome.clone(), seed.unwrap_or_else(next_seed), level)
         }))
     } else {
         None
     };
 
     crate::run(
-        TetrisScenario::<CEngine>::new(level, games),
+        TetrisScenario::<CEngine>::new(level, games, seed),
         dir,
         common,
         watch_fn,
