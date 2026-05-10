@@ -168,9 +168,9 @@ int tetris_tick(struct tetris_ctx *ctx, int input)
 		if (!ctx_move(ctx, 0, 1, 0))
 			return 1;
 
-	/* Horizontal movement — only on new press */
-	if (new_buttons & 0x04) ctx_move(ctx, -1, 0, 0); /* LEFT  */
-	if (new_buttons & 0x08) ctx_move(ctx,  1, 0, 0); /* RIGHT */
+	/* Horizontal movement — fires every tick while held */
+	if (input & 0x04) ctx_move(ctx, -1, 0, 0); /* LEFT  */
+	if (input & 0x08) ctx_move(ctx,  1, 0, 0); /* RIGHT */
 
 	ctx->last_input = input;
 	return 0;
