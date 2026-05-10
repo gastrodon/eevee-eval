@@ -4,7 +4,7 @@
 /// [`TetrisScenario`], which provides the eevee `Scenario` impl for free.
 use eevee::{
     genome::Genome,
-    network::{Continuous, ToNetwork},
+    network::{Feedforward, ToNetwork},
     random::WyRng,
     Connection, Network, Scenario,
 };
@@ -73,7 +73,7 @@ impl<E, C, G, A> Scenario<C, G, A> for TetrisScenario<E>
 where
     E: TetrisEngine,
     C: Connection,
-    G: Genome<C> + ToNetwork<Continuous, C>,
+    G: Genome<C> + ToNetwork<Feedforward, C>,
     A: Fn(f64) -> f64,
 {
     fn io(&self) -> (usize, usize) {

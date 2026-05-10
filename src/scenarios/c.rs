@@ -7,11 +7,19 @@ use clap::Parser;
 use core::ops::ControlFlow;
 use eevee::{
     activate::relu,
-    genome::{Recurrent, WConnection},
-    network::{Continuous, FromGenome, ToNetwork},
+    genome::{NonRecurrent, WConnection},
+    network::{Feedforward, FromGenome, ToNetwork},
     Connection, Genome, Network,
 };
 use std::ffi::c_void;
+
+// ---------------------------------------------------------------------------
+// Concrete types — change these to swap genome/network implementation
+// ---------------------------------------------------------------------------
+
+type C = WConnection;
+type G = NonRecurrent<C>;
+type NN = Feedforward;
 
 // ---------------------------------------------------------------------------
 // Scenario-specific CLI args
@@ -152,10 +160,6 @@ pub fn run(dir: &str, common: CommonArgs, extra: Vec<String>) {
     let games = targs.games;
     let level = targs.level;
 
-    type C = WConnection;
-    type G = Recurrent<C>;
-    type N = Continuous;
-
     let watch_hook: Hook<C, G> = Box::new(|stats: &mut Stats<C, G>| {
         let max = stats.fittest().map(|(_, f)| *f).unwrap_or(0.0);
         update_watch(stats.generation, max);
@@ -164,7 +168,7 @@ pub fn run(dir: &str, common: CommonArgs, extra: Vec<String>) {
 
     let watch_fn: Option<Box<WatchFn<G>>> = if watch {
         Some(Box::new(move |genome| {
-            run_exhibition_game::<C, G, N>(genome.clone(), next_seed(), level)
+            run_exhibition_game::<C, G, NN>(genome.clone(), next_seed(), level)
         }))
     } else {
         None

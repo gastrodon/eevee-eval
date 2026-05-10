@@ -3,14 +3,22 @@ use clap::Parser;
 use core::ops::ControlFlow;
 use eevee::{
     activate::relu,
-    genome::{connection::BWConnection, Genome, Recurrent, WConnection},
-    network::{Continuous, FromGenome, Simple, ToNetwork},
+    genome::{connection::BWConnection, Genome, NonRecurrent, WConnection},
+    network::{Feedforward, FromGenome, ToNetwork},
     Connection, Network, Scenario,
 };
 use nes_rust_slim::{
     button::Button, default_audio::DefaultAudio, default_display::DefaultDisplay,
     default_input::DefaultInput, rom::Rom, Nes,
 };
+
+// ---------------------------------------------------------------------------
+// Concrete types — change these to swap genome/network implementation
+// ---------------------------------------------------------------------------
+
+type C = BWConnection;
+type G = NonRecurrent<C>;
+type NN = Feedforward;
 
 // ---------------------------------------------------------------------------
 // Scenario-specific CLI args
@@ -136,7 +144,7 @@ impl MarioScenario {
 impl<C, G, A> Scenario<C, G, A> for MarioScenario
 where
     C: Connection,
-    G: Genome<C> + ToNetwork<Continuous, C>,
+    G: Genome<C> + ToNetwork<Feedforward, C>,
     A: Fn(f64) -> f64,
 {
     fn io(&self) -> (usize, usize) {
@@ -308,10 +316,6 @@ fn run_exhibition<C: Connection, G: Genome<C>, NN: Network + FromGenome<C, G>>(g
 pub fn run(dir: &str, common: CommonArgs, extra: Vec<String>) {
     let margs =
         MarioArgs::parse_from(std::iter::once("nes-mario").chain(extra.iter().map(String::as_str)));
-
-    type C = BWConnection;
-    type G = Recurrent<C>;
-    type NN = Simple<C>;
 
     let watch = common.watch;
     let max_frames = margs.max_frames;
