@@ -99,16 +99,27 @@ exclude = ["eevee"]'
           x11nes = mkPkg {
             cargoExtraArgs = "--features x11nes";
             buildInputs = x11Libs;
-            nativeBuildInputs = [ pkgs.pkg-config ];
+            nativeBuildInputs = [ pkgs.pkg-config pkgs.makeWrapper ];
+            postInstall = ''
+              wrapProgram $out/bin/eevee-eval \
+                --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath x11Libs}
+            '';
           };
           x11nes-parallel = mkPkg {
             cargoExtraArgs = "--features x11nes,parallel";
             buildInputs = x11Libs;
-            nativeBuildInputs = [ pkgs.pkg-config ];
+            nativeBuildInputs = [ pkgs.pkg-config pkgs.makeWrapper ];
+            postInstall = ''
+              wrapProgram $out/bin/eevee-eval \
+                --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath x11Libs}
+            '';
           };
         };
 
-        devShells.default = craneLib.devShell { };
+        devShells.default = craneLib.devShell {
+          packages = x11Libs ++ [ pkgs.pkg-config ];
+          LD_LIBRARY_PATH = lib.makeLibraryPath x11Libs;
+        };
       }
     );
 }
