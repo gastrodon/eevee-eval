@@ -4,5 +4,5 @@ until_generation: 1000
 population: 64
 report_every: 10
 watch: false
-extra: "--level 10 --games 8"
-specie_threshold: 1.7
+extra: "--level 1 --games 8"
+specie_threshold: 1.1
