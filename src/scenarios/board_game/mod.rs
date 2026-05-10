@@ -8,7 +8,7 @@ use board_game::board::Player;
 use core::ops::ControlFlow;
 use eevee::{
     genome::{Recurrent, WConnection},
-    network::{activate::steep_sigmoid, FromGenome, Network, ToNetwork},
+    network::{activate::steep_sigmoid, Continuous, FromGenome, Network, ToNetwork},
     population::population_init,
     random::{seed_urandom, WyRng},
     scenario::{evolve, EvolutionHooks},
@@ -39,7 +39,7 @@ pub type G = Recurrent<C>;
 pub trait CoEvolGame {
     const GAMES_PER_EVAL: usize;
     fn io() -> (usize, usize);
-    fn play<NN: Network, A: Fn(f64) -> f64>(
+    fn play<NN: Network + Continuous, A: Fn(f64) -> f64>(
         learner: &mut NN,
         learner_player: Player,
         opponent: Option<&mut NN>,
@@ -66,7 +66,7 @@ impl<T: CoEvolGame, NN> CoEvolScenario<T, NN> {
     }
 }
 
-impl<T: CoEvolGame, NN: Network + FromGenome<C, G>, A: Fn(f64) -> f64> Scenario<C, G, A>
+impl<T: CoEvolGame, NN: Network + Continuous + FromGenome<C, G>, A: Fn(f64) -> f64> Scenario<C, G, A>
     for CoEvolScenario<T, NN>
 {
     fn io(&self) -> (usize, usize) {
@@ -148,7 +148,7 @@ pub fn board_game_run<
     create_dir_all(dir).expect("failed to create genome output directory");
 
     let (inputs, outputs) = scenario.io();
-    let init = population_from_files(dir)
+    let init = population_from_files(dir, common.specie_threshold)
         .unwrap_or_else(|_| population_init::<C, G>(inputs, outputs, common.population));
 
     let watch = common.watch;

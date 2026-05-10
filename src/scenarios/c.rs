@@ -8,7 +8,7 @@ use core::ops::ControlFlow;
 use eevee::{
     activate::relu,
     genome::{NonRecurrent, WConnection},
-    network::{Feedforward, FromGenome, ToNetwork},
+    network::{FeedForward, FromGenome, ToNetwork},
     Connection, Genome, Network,
 };
 use std::ffi::c_void;
@@ -19,7 +19,7 @@ use std::ffi::c_void;
 
 type C = WConnection;
 type G = NonRecurrent<C>;
-type NN = Feedforward;
+type NN = FeedForward;
 
 // ---------------------------------------------------------------------------
 // Scenario-specific CLI args
@@ -134,7 +134,7 @@ fn run_exhibition_game<C: Connection, G: Genome<C>, NN: Network + FromGenome<C, 
 
     loop {
         engine.sense(&mut sense);
-        network.step(1, &sense, &relu);
+        network.step(&sense, &relu);
         let outputs = network.output().to_vec();
 
         print!("\x1b[H");

@@ -5,13 +5,11 @@ use board_game::board::{Board, Outcome, Player};
 use board_game::games::ttt::TTTBoard;
 use board_game::util::coord::Coord3;
 use eevee::{
-    network::{Continuous, FromGenome, Network, ToNetwork},
+    network::{Continuous, FromGenome, Network, Realtime, ToNetwork},
     random::WyRng,
 };
 use rand::{Rng, RngCore};
 use std::sync::{Arc, RwLock};
-
-const NETWORK_PREC: usize = 20;
 
 fn coord(i: usize) -> Coord3 {
     Coord3::from_xy((i % 3) as u8, (i / 3) as u8)
@@ -50,7 +48,7 @@ fn network_move<NN: Network, A: Fn(f64) -> f64>(
         return None;
     }
     let input = encode_board(board, viewpoint);
-    network.step(NETWORK_PREC, &input, σ);
+    network.step(&input, σ);
     let output = network.output();
 
     let mut best = legal[0];
@@ -74,7 +72,7 @@ fn random_move<R: RngCore>(board: &TTTBoard, rng: &mut R) -> Option<Coord3> {
     }
 }
 
-fn play_game<NN: Network, A: Fn(f64) -> f64>(
+fn play_game<NN: Network + Continuous, A: Fn(f64) -> f64>(
     learner: &mut NN,
     learner_player: Player,
     opponent: Option<&mut NN>,
@@ -82,10 +80,10 @@ fn play_game<NN: Network, A: Fn(f64) -> f64>(
     rng: &mut eevee::random::WyRng,
 ) -> f64 {
     let mut board = TTTBoard::default();
-    learner.flush();
+    learner.reset();
     let mut opponent = opponent;
     if let Some(o) = opponent.as_deref_mut() {
-        o.flush();
+        o.reset();
     }
 
     while !board.is_done() {
@@ -118,7 +116,7 @@ pub struct TttGame;
 impl CoEvolGame for TttGame {
     const GAMES_PER_EVAL: usize = 8;
     fn io() -> (usize, usize) { (18, 9) }
-    fn play<NN: Network, A: Fn(f64) -> f64>(
+    fn play<NN: Network + Continuous, A: Fn(f64) -> f64>(
         learner: &mut NN,
         learner_player: Player,
         opponent: Option<&mut NN>,
@@ -148,13 +146,13 @@ fn render_ttt(board: &TTTBoard) {
     println!();
 }
 
-fn run_exhibition_game<NN: Network + FromGenome<C, G>>(genome: &G) {
+fn run_exhibition_game<NN: Network + Continuous + FromGenome<C, G>>(genome: &G) {
     use eevee::network::activate::steep_sigmoid;
     let mut board = TTTBoard::default();
     let mut net_a: NN = genome.network();
     let mut net_b: NN = genome.network();
-    net_a.flush();
-    net_b.flush();
+    net_a.reset();
+    net_b.reset();
     render_ttt(&board);
     while !board.is_done() {
         std::thread::sleep(std::time::Duration::from_millis(500));
@@ -171,7 +169,7 @@ fn run_exhibition_game<NN: Network + FromGenome<C, G>>(genome: &G) {
 
 pub fn run(dir: &str, common: CommonArgs, _extra: Vec<String>) {
     use eevee::random::seed_urandom;
-    type N = Continuous;
+    type N = Realtime;
     let base_seed = seed_urandom().unwrap();
     let pool = Arc::new(RwLock::new(vec![]));
     let scenario = CoEvolScenario::<TttGame, N>::new(Arc::clone(&pool), base_seed);

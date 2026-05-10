@@ -233,7 +233,7 @@ pub fn run<
 
     create_dir_all(dir).expect("failed to create genome output directory");
 
-    let init = population_from_files(dir).unwrap_or_else(|_| {
+    let init = population_from_files(dir, args.specie_threshold).unwrap_or_else(|_| {
         let (inputs, outputs) = scenario.io();
         population_init::<C, G>(inputs, outputs, args.population)
     });

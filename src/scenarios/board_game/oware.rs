@@ -4,13 +4,12 @@ use crate::CommonArgs;
 use board_game::board::{Board, Outcome, Player};
 use board_game::games::oware::OwareBoard;
 use eevee::{
-    network::{Continuous, FromGenome, Network, ToNetwork},
+    network::{Continuous, FromGenome, Network, Realtime, ToNetwork},
     random::WyRng,
 };
 use rand::{Rng, RngCore};
 use std::sync::{Arc, RwLock};
 
-const NETWORK_PREC: usize = 20;
 const MAX_PLIES: usize = 200;
 
 const PITS: usize = 6;
@@ -52,7 +51,7 @@ fn network_move<NN: Network, A: Fn(f64) -> f64>(
         return None;
     }
     let input = encode_board(board, viewpoint);
-    network.step(NETWORK_PREC, &input, σ);
+    network.step(&input, σ);
     let output = network.output();
 
     let mut best = legal[0];
@@ -75,7 +74,7 @@ fn random_move<R: RngCore>(board: &Game, rng: &mut R) -> Option<usize> {
     }
 }
 
-fn play_game<NN: Network, A: Fn(f64) -> f64>(
+fn play_game<NN: Network + Continuous, A: Fn(f64) -> f64>(
     learner: &mut NN,
     learner_player: Player,
     opponent: Option<&mut NN>,
@@ -83,10 +82,10 @@ fn play_game<NN: Network, A: Fn(f64) -> f64>(
     rng: &mut eevee::random::WyRng,
 ) -> f64 {
     let mut board = Game::default();
-    learner.flush();
+    learner.reset();
     let mut opponent = opponent;
     if let Some(o) = opponent.as_deref_mut() {
-        o.flush();
+        o.reset();
     }
 
     let mut plies = 0;
@@ -128,7 +127,7 @@ pub struct OwareGame;
 impl CoEvolGame for OwareGame {
     const GAMES_PER_EVAL: usize = 6;
     fn io() -> (usize, usize) { (INPUT_DIM, OUTPUT_DIM) }
-    fn play<NN: Network, A: Fn(f64) -> f64>(
+    fn play<NN: Network + Continuous, A: Fn(f64) -> f64>(
         learner: &mut NN,
         learner_player: Player,
         opponent: Option<&mut NN>,
@@ -163,13 +162,13 @@ fn render_oware(board: &Game) {
     println!();
 }
 
-fn run_exhibition_game<NN: Network + FromGenome<C, G>>(genome: &G) {
+fn run_exhibition_game<NN: Network + Continuous + FromGenome<C, G>>(genome: &G) {
     use eevee::network::activate::steep_sigmoid;
     let mut board = Game::default();
     let mut net_a: NN = genome.network();
     let mut net_b: NN = genome.network();
-    net_a.flush();
-    net_b.flush();
+    net_a.reset();
+    net_b.reset();
     render_oware(&board);
     let mut plies = 0usize;
     while !board.is_done() && plies < MAX_PLIES {
@@ -190,7 +189,7 @@ fn run_exhibition_game<NN: Network + FromGenome<C, G>>(genome: &G) {
 
 pub fn run(dir: &str, common: CommonArgs, _extra: Vec<String>) {
     use eevee::random::seed_urandom;
-    type N = Continuous;
+    type N = Realtime;
     let base_seed = seed_urandom().unwrap();
     let pool = Arc::new(RwLock::new(vec![]));
     let scenario = CoEvolScenario::<OwareGame, N>::new(Arc::clone(&pool), base_seed);

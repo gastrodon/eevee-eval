@@ -4,7 +4,7 @@ use core::ops::ControlFlow;
 use eevee::{
     activate::relu,
     genome::{connection::BWConnection, Genome, NonRecurrent, WConnection},
-    network::{Feedforward, FromGenome, ToNetwork},
+    network::{FeedForward, FromGenome, ToNetwork},
     Connection, Network, Scenario,
 };
 use nes_rust_slim::{
@@ -18,7 +18,7 @@ use nes_rust_slim::{
 
 type C = BWConnection;
 type G = NonRecurrent<C>;
-type NN = Feedforward;
+type NN = FeedForward;
 
 // ---------------------------------------------------------------------------
 // Scenario-specific CLI args
@@ -144,7 +144,7 @@ impl MarioScenario {
 impl<C, G, A> Scenario<C, G, A> for MarioScenario
 where
     C: Connection,
-    G: Genome<C> + ToNetwork<Feedforward, C>,
+    G: Genome<C> + ToNetwork<FeedForward, C>,
     A: Fn(f64) -> f64,
 {
     fn io(&self) -> (usize, usize) {
@@ -168,7 +168,7 @@ where
 
         for _ in 0..self.max_frames {
             fill_sense(&nes.get_cpu().get_ram().data, &mut sense);
-            network.step(1, &sense, σ);
+            network.step(&sense, σ);
             let outputs = network.output().to_vec();
             apply_outputs(&mut nes, &outputs);
             nes.step_frame();
@@ -264,7 +264,7 @@ fn run_exhibition<C: Connection, G: Genome<C>, NN: Network + FromGenome<C, G>>(g
 
     for _ in 0..3_600 {
         fill_sense(&nes.get_cpu().get_ram().data, &mut sense);
-        network.step(1, &sense, &relu);
+        network.step(&sense, &relu);
         let outputs = network.output().to_vec();
 
         print!("\x1b[H");

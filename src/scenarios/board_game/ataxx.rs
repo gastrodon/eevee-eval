@@ -5,14 +5,12 @@ use board_game::board::{Board, BoardMoves, Outcome, Player};
 use board_game::games::ataxx::{AtaxxBoard, Move};
 use board_game::util::coord::Coord8;
 use eevee::{
-    network::{Continuous, FromGenome, Network, ToNetwork},
+    network::{Continuous, FromGenome, Network, Realtime, ToNetwork},
     random::WyRng,
 };
 use internal_iterator::InternalIterator;
 use rand::{Rng, RngCore};
 use std::sync::{Arc, RwLock};
-
-const NETWORK_PREC: usize = 20;
 
 const BOARD_SIZE: u8 = 7;
 const CELLS: usize = (BOARD_SIZE as usize) * (BOARD_SIZE as usize);
@@ -79,7 +77,7 @@ fn network_move<NN: Network, A: Fn(f64) -> f64>(
         return Some(legal[0]);
     }
     let input = encode_board(board, viewpoint);
-    network.step(NETWORK_PREC, &input, σ);
+    network.step(&input, σ);
     let output = network.output();
 
     let mut best = legal[0];
@@ -103,7 +101,7 @@ fn random_move<R: RngCore>(board: &AtaxxBoard, rng: &mut R) -> Option<Move> {
     }
 }
 
-fn play_game<NN: Network, A: Fn(f64) -> f64>(
+fn play_game<NN: Network + Continuous, A: Fn(f64) -> f64>(
     learner: &mut NN,
     learner_player: Player,
     opponent: Option<&mut NN>,
@@ -111,10 +109,10 @@ fn play_game<NN: Network, A: Fn(f64) -> f64>(
     rng: &mut eevee::random::WyRng,
 ) -> f64 {
     let mut board = AtaxxBoard::diagonal(BOARD_SIZE);
-    learner.flush();
+    learner.reset();
     let mut opponent = opponent;
     if let Some(o) = opponent.as_deref_mut() {
-        o.flush();
+        o.reset();
     }
 
     while !board.is_done() {
@@ -149,7 +147,7 @@ impl CoEvolGame for AtaxxGame {
     fn io() -> (usize, usize) {
         (INPUT_DIM, OUTPUT_DIM)
     }
-    fn play<NN: Network, A: Fn(f64) -> f64>(
+    fn play<NN: Network + Continuous, A: Fn(f64) -> f64>(
         learner: &mut NN,
         learner_player: Player,
         opponent: Option<&mut NN>,
@@ -184,13 +182,13 @@ fn render_ataxx(board: &AtaxxBoard) {
     println!();
 }
 
-fn run_exhibition_game<NN: Network + FromGenome<C, G>>(genome: &G) {
+fn run_exhibition_game<NN: Network + Continuous + FromGenome<C, G>>(genome: &G) {
     use eevee::network::activate::steep_sigmoid;
     let mut board = AtaxxBoard::diagonal(BOARD_SIZE);
     let mut net_a: NN = genome.network();
     let mut net_b: NN = genome.network();
-    net_a.flush();
-    net_b.flush();
+    net_a.reset();
+    net_b.reset();
     render_ataxx(&board);
     let mut plies = 0usize;
     while !board.is_done() && plies < 200 {
@@ -215,7 +213,7 @@ fn run_exhibition_game<NN: Network + FromGenome<C, G>>(genome: &G) {
 
 pub fn run(dir: &str, common: CommonArgs, _extra: Vec<String>) {
     use eevee::random::seed_urandom;
-    type N = Continuous;
+    type N = Realtime;
     let base_seed = seed_urandom().unwrap();
     let pool = Arc::new(RwLock::new(vec![]));
     let scenario = CoEvolScenario::<AtaxxGame, N>::new(Arc::clone(&pool), base_seed);

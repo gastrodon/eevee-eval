@@ -1,15 +1,15 @@
+use eevee::random::seed_urandom;
 /// Shared abstractions for Tetris NEAT scenarios.
 ///
 /// Both `nes-tetris` and `tetris-c` implement [`TetrisEngine`] and wrap it in
 /// [`TetrisScenario`], which provides the eevee `Scenario` impl for free.
 use eevee::{
     genome::Genome,
-    network::{Feedforward, ToNetwork},
+    network::{FeedForward, ToNetwork},
     random::WyRng,
     Connection, Network, Scenario,
 };
 use rand::RngCore;
-use eevee::random::seed_urandom;
 use std::{
     marker::PhantomData,
     sync::{
@@ -65,7 +65,11 @@ pub struct TetrisScenario<E: TetrisEngine> {
 
 impl<E: TetrisEngine> TetrisScenario<E> {
     pub fn new(level: u8, games: usize) -> Self {
-        Self { level, games, _engine: PhantomData }
+        Self {
+            level,
+            games,
+            _engine: PhantomData,
+        }
     }
 }
 
@@ -73,7 +77,7 @@ impl<E, C, G, A> Scenario<C, G, A> for TetrisScenario<E>
 where
     E: TetrisEngine,
     C: Connection,
-    G: Genome<C> + ToNetwork<Feedforward, C>,
+    G: Genome<C> + ToNetwork<FeedForward, C>,
     A: Fn(f64) -> f64,
 {
     fn io(&self) -> (usize, usize) {
@@ -89,7 +93,7 @@ where
                 let mut sense = [0.0f64; BOARD_SIZE];
                 loop {
                     engine.sense(&mut sense);
-                    network.step(1, &sense, σ);
+                    network.step(&sense, σ);
                     if engine.tick(network.output()) {
                         break;
                     }
